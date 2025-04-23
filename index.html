@@ -18,6 +18,13 @@
         background: radial-gradient(#000010, #000000);
         color: #0ff;
       }
+      button {
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+        user-select: text;
+        touch-action: manipulation;
+      }
     </style>
   </head>
   <body>
@@ -34,6 +41,61 @@
         z-index: 1000;
       "
     ></div>
+    <!-- Mobile Touch Controls (conditionally rendered via JS below) -->
+
+    <!-- Insert HUD buttons dynamically based on screen size and device -->
+    <script>
+      function renderHUDButtonsIfSmallScreen() {
+        const hud = document.getElementById('hud');
+        const controlMap = document.getElementById('controlMap');
+        if (window.innerWidth <= 1024 || window.innerHeight <= 768) {
+          if (!document.getElementById('hud-buttons')) {
+            const buttonContainer = document.createElement('div');
+            buttonContainer.id = 'hud-buttons';
+            const controls = [
+              { key: '1', label: 'View 1' },
+              { key: '2', label: 'View 2' },
+              { key: '3', label: 'View 3' },
+              { key: 'r', label: 'Red' },
+              { key: 'g', label: 'Glitch' },
+              { key: 'b', label: 'Blue' },
+              { key: 'p', label: 'Purple' },
+              { key: 'y', label: 'Yellow' },
+              { key: 'f', label: 'Fisheye' },
+              { key: 'v', label: 'Wormhole' },
+              { key: 'e', label: 'Explode' },
+              { key: 'k', label: 'Repel' },
+              { key: 'l', label: 'Retract' },
+              { key: 'z', label: 'Temple' }
+            ];
+            controls.forEach(control => {
+              const btn = document.createElement('button');
+              btn.textContent = control.label;
+              btn.style.cssText = 'margin:4px;background:rgba(255,255,255,0.1);color:white;border:1px solid white;padding:8px 12px;font-size:14px;border-radius:4px;';
+              if (control.key === 'g') {
+                btn.addEventListener('click', () => {
+                  glitchPass.enabled = !glitchPass.enabled;
+                });
+              } else {
+                btn.addEventListener('click', () => {
+                  window.dispatchEvent(new KeyboardEvent('keydown', { key: control.key }));
+                });
+              }
+              buttonContainer.appendChild(btn);
+            });
+            hud.appendChild(buttonContainer);
+          }
+          if (controlMap) controlMap.style.display = 'none';
+        } else {
+          const oldButtons = document.getElementById('hud-buttons');
+          if (oldButtons) hud.removeChild(oldButtons);
+          if (controlMap) controlMap.style.display = 'block';
+        }
+      }
+
+      renderHUDButtonsIfSmallScreen();
+      window.addEventListener('resize', renderHUDButtonsIfSmallScreen);
+    </script>
     <div
       id="controlMap"
       style="
