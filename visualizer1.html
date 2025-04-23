@@ -1,0 +1,1334 @@
+<!-- (All Three.js logic is now inside the script block below) -->
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <title>Insane 3D Visualizer</title>
+    <style>
+      html,
+      body {
+        margin: 0;
+        overflow: hidden;
+        background: #000;
+      }
+      canvas {
+        display: block;
+      }
+      body.theme-techno {
+        background: radial-gradient(#000010, #000000);
+        color: #0ff;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      id="hud"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        padding: 10px;
+        color: #fff;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 1000;
+      "
+    ></div>
+    <div
+      id="controlMap"
+      style="
+        position: fixed;
+        top: 40px;
+        left: 10px;
+        padding: 10px;
+        background: rgba(0, 0, 0, 0.5);
+        color: #fff;
+        font-family: monospace;
+        font-size: 11px;
+        z-index: 1000;
+        border-radius: 5px;
+      "
+    >
+      <strong>🖱 Mouse:</strong><br />
+      • Left Drag: Orbit<br />
+      • Scroll: Zoom<br />
+      • Right Drag: Pan<br /><br />
+      <strong>⌨ Keys:</strong><br />
+      [1/2/3] View Modes<br />
+      [R/G/B/P/Y] Color Palettes<br />
+      [F] Fisheye Lens<br />
+      [T] Toggle Theme<br />
+      [E] Explosion<br />
+      [K] Repel Outward + Particles<br />
+      [L] Retract Shapes<br />
+      [V] Wormhole View<br />
+      [Z] Regenerate Temple<br />
+      [X/C/D/W] FX Toggles<br />
+      [G] Glitch On/Off
+    </div>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/build/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/postprocessing/EffectComposer.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/postprocessing/RenderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/shaders/CopyShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/shaders/LuminosityHighPassShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/postprocessing/ShaderPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/shaders/DigitalGlitch.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/postprocessing/GlitchPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/postprocessing/UnrealBloomPass.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/shaders/RGBShiftShader.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/postprocessing/RGBShiftPass.js"></script>
+    <script>
+      // --- Negative Color (Invert) Shader Pass ---
+      const invertShader = {
+        uniforms: { tDiffuse: { value: null } },
+        vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+        }
+      `,
+        fragmentShader: `
+        uniform sampler2D tDiffuse;
+        varying vec2 vUv;
+        void main() {
+          vec4 color = texture2D(tDiffuse, vUv);
+          vec3 inverted = 1.0 - color.rgb;
+          gl_FragColor = vec4(mix(color.rgb, inverted, 0.9), color.a);
+        }
+      `,
+      };
+      const invertPass = new THREE.ShaderPass(invertShader);
+      invertPass.enabled = false;
+      // Add to composer after other passes
+      composer && composer.addPass && composer.addPass(invertPass);
+    </script>
+    <script>
+      // --- Wormhole Distortion Shader Pass ---
+      const wormholeShader = {
+        uniforms: { tDiffuse: { value: null }, time: { value: 0.0 } },
+        vertexShader: `varying vec2 vUv; void main() { vUv = uv; gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 ); }`,
+        fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float time;
+        varying vec2 vUv;
+        void main() {
+          vec2 p = vUv - 0.5;
+          float r = length(p);
+          float angle = atan(p.y, p.x) + 0.5 * sin(time + r * 20.0);
+          float radius = pow(r, 0.8);
+          vec2 uv = 0.5 + vec2(cos(angle), sin(angle)) * radius;
+          gl_FragColor = texture2D(tDiffuse, uv);
+        }`,
+      };
+      // --- Meteor Shower System ---
+      const meteorGeo = new THREE.BufferGeometry();
+      const meteorCount = 100;
+      const meteorPos = [];
+      const meteorVel = [];
+      for (let i = 0; i < meteorCount; i++) {
+        meteorPos.push(
+          Math.random() * 200 - 100,
+          Math.random() * 100 + 100,
+          Math.random() * 200 - 100
+        );
+        meteorVel.push(0, -0.5 - Math.random(), 0);
+      }
+      meteorGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(meteorPos, 3)
+      );
+      const meteorMat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 2,
+        transparent: true,
+        opacity: 0.6,
+      });
+      const meteors = new THREE.Points(meteorGeo, meteorMat);
+      // ----------------- END Meteor Shower Setup -----------------
+      const scene = new THREE.Scene();
+      const camera = new THREE.PerspectiveCamera(
+        75,
+        window.innerWidth / window.innerHeight,
+        0.1,
+        2000
+      );
+      camera.position.z = 30;
+
+      const renderer = new THREE.WebGLRenderer({ antialias: true });
+      renderer.setSize(window.innerWidth, window.innerHeight);
+      document.body.appendChild(renderer.domElement);
+
+      const composer = new THREE.EffectComposer(renderer);
+      const renderPass = new THREE.RenderPass(scene, camera);
+      const bloomPass = new THREE.UnrealBloomPass(
+        new THREE.Vector2(window.innerWidth, window.innerHeight),
+        1.5, // strength
+        0.4, // radius
+        0.85 // threshold
+      );
+      composer.addPass(renderPass);
+      composer.addPass(bloomPass);
+      const rgbShift = new THREE.ShaderPass(THREE.RGBShiftShader);
+      rgbShift.uniforms["amount"].value = 0.0015;
+      composer.addPass(rgbShift);
+      // Add wormhole pass (after rgbshift)
+      const wormholePass = new THREE.ShaderPass(wormholeShader);
+      wormholePass.enabled = false;
+      composer.addPass(wormholePass);
+      // Add meteor shower to scene
+      scene.add(meteors);
+      // --- Fisheye Shader Pass ---
+      const fisheyeShader = {
+        uniforms: {
+          tDiffuse: { value: null },
+          strength: { value: 0.6 },
+        },
+        vertexShader: `
+        varying vec2 vUv;
+        void main() {
+          vUv = uv;
+          gl_Position = projectionMatrix * modelViewMatrix * vec4( position, 1.0 );
+        }
+      `,
+        fragmentShader: `
+        uniform sampler2D tDiffuse;
+        uniform float strength;
+        varying vec2 vUv;
+        void main() {
+          vec2 p = vUv * 2.0 - 1.0;
+          vec2 ovalP = vec2(p.x * 1.3, p.y); // horizontal stretch
+          float len = length(ovalP);
+          float blur = smoothstep(0.7, 1.0, len);
+          float factor = 1.0 + strength * len * len * (1.0 + blur);
+          vec2 uv = p / factor + 0.5;
+          gl_FragColor = texture2D(tDiffuse, uv);
+        }
+      `,
+      };
+      const fisheyePass = new THREE.ShaderPass(fisheyeShader);
+      fisheyePass.enabled = false;
+      composer.addPass(fisheyePass);
+
+      // --- Glitch Pass (subtle, momentary, controlled by glitchMode) ---
+      // We define glitchPass here so it's available to animate().
+      let glitchPass;
+
+      // --- Retract Shapes effect ---
+      function triggerRetract() {
+        let startTime = Date.now();
+        const duration = 1000;
+
+        function retractStep() {
+          const elapsed = Date.now() - startTime;
+          const progress = Math.min(1, elapsed / duration);
+
+          shapes.forEach((mesh) => {
+            if (mesh.userData.initialPosition) {
+              mesh.position.lerp(mesh.userData.initialPosition, 0.2);
+            }
+          });
+
+          if (progress < 1) {
+            requestAnimationFrame(retractStep);
+          } else {
+            shapes.forEach((mesh) => {
+              if (mesh.userData.initialPosition) {
+                mesh.position.copy(mesh.userData.initialPosition);
+              }
+            });
+          }
+        }
+
+        retractStep();
+      }
+
+      // Keyboard event: change color palette with key presses and toggle control map
+      window.addEventListener("keydown", (e) => {
+
+        switch (e.key.toLowerCase()) {
+            case "arrowleft":
+  targetYawAngle = Math.max(-Math.PI, targetYawAngle - 0.05);
+  break;
+case "arrowright":
+  targetYawAngle = Math.min(Math.PI, targetYawAngle + 0.05);
+  break;
+            case "arrowup":
+  targetTiltAngle = Math.max(-Math.PI / 2 + 0.1, targetTiltAngle - 0.05);
+  break;
+case "arrowdown":
+  targetTiltAngle = Math.min(Math.PI / 2 - 0.1, targetTiltAngle + 0.05);
+  break;
+          case "n":
+            invertPass.enabled = !invertPass.enabled;
+            break;
+          case "r": // Red tones
+            updatePalette(0.0);
+            break;
+          case "g":
+            glitchPass.enabled = true;
+            break;
+          case "b": // Blue tones
+            updatePalette(0.66);
+            break;
+          case "p": // Purple/pink tones
+            updatePalette(0.85);
+            break;
+          case "y": // Yellow/orange tones
+            updatePalette(0.12);
+            break;
+          case "c": // Toggle contrast by increasing emissive intensity
+            shapes.forEach((mesh) => {
+              mesh.material.emissiveIntensity =
+                mesh.material.emissiveIntensity === 1 ? 4 : 1;
+            });
+            break;
+          case "d": // Dim the scene
+            colorLights.forEach((light) => {
+              light.intensity = light.intensity > 1 ? 0.2 : 2;
+            });
+            break;
+          case "w": // Wash out saturation
+            shapes.forEach((mesh) => {
+              const hsl = {};
+              mesh.material.color.getHSL(hsl);
+              mesh.material.color.setHSL(hsl.h, 0.1, hsl.l); // low saturation
+            });
+            break;
+          case "x": // Randomize everything
+            updatePalette(Math.random());
+            shapes.forEach((mesh) => {
+              mesh.material.emissive.setHSL(Math.random(), 1, 0.5);
+              mesh.material.emissiveIntensity = 1 + Math.random() * 4;
+            });
+            break;
+          case "m":
+            trailsEnabled = !trailsEnabled;
+            break;
+          case "1":
+            cameraMode = "orbit";
+            break;
+          case "2":
+            cameraMode = "zoom";
+            break;
+          case "3":
+            cameraMode = "top";
+            break;
+          case "t": // Toggle theme
+            document.body.classList.toggle("theme-techno");
+            break;
+          case "f":
+            fisheyePass.enabled = !fisheyePass.enabled;
+            break;
+          case "e":
+            triggerExplosion();
+            break;
+          case "k":
+            triggerRepelExplosion();
+            break;
+          case "l":
+            triggerRetract();
+            break;
+          case "v":
+            wormholePass.enabled = !wormholePass.enabled;
+            break;
+          // --- Keyboard zoom in/out ---
+          case "+":
+          case "=": // for key next to backspace
+            if (cameraMode === "zoom") manualZoom = Math.max(5, manualZoom - 1);
+            break;
+          case "-":
+          case "_":
+            if (cameraMode === "zoom")
+              manualZoom = Math.min(100, manualZoom + 1);
+            break;
+          // --- Toggle control map panel ---
+          case "?":
+          case "h":
+            const cm = document.getElementById("controlMap");
+            cm.style.display = cm.style.display === "none" ? "block" : "none";
+            break;
+        }
+      });
+
+      window.addEventListener("keyup", (e) => {
+        if (e.key.toLowerCase() === "g") {
+          glitchPass.enabled = false;
+        }
+      });
+
+      function updatePalette(baseHue) {
+        colorLights.forEach((light) => {
+          light.color.setHSL(baseHue + Math.random() * 0.1, 1, 0.6);
+        });
+        shapes.forEach((mesh) => {
+          mesh.material.color.setHSL(baseHue + Math.random() * 0.1, 0.8, 0.5);
+        });
+      }
+
+      const controls = new THREE.OrbitControls(camera, renderer.domElement);
+      controls.enableDamping = true;
+      controls.dampingFactor = 0.08;
+      controls.rotateSpeed = 0.8;
+      controls.zoomSpeed = 1.0;
+      controls.panSpeed = 0.5;
+      controls.screenSpacePanning = true;
+      controls.minPolarAngle = 0;
+      controls.maxPolarAngle = Math.PI; // This allows full vertical rotation
+      controls.target.set(0, 0, 0); // Ensure the target is not being reset
+      controls.enablePan = true;
+      controls.mouseButtons.LEFT = THREE.MOUSE.ROTATE;
+      controls.mouseButtons.RIGHT = THREE.MOUSE.PAN;
+
+      let cameraMode = "orbit";
+      let manualZoom = 30;
+      let tiltAngle = 0;
+      let yawAngle = 0;
+let targetYawAngle = 0;
+      let targetTiltAngle = 0;
+      let theta = 0;
+
+      const colorLights = [];
+      for (let i = 0; i < 3; i++) {
+        const light = new THREE.PointLight(Math.random() * 0xffffff, 2, 200);
+        light.position.set(
+          Math.random() * 50 - 25,
+          Math.random() * 50 - 25,
+          Math.random() * 50 - 25
+        );
+        scene.add(light);
+        colorLights.push(light);
+      }
+
+      const randomMat = () =>
+        new THREE.MeshStandardMaterial({
+          color: Math.random() * 0xffffff,
+          roughness: 0.3,
+          metalness: 0.6,
+          emissive: Math.random() * 0x202020,
+        });
+
+      const shapes = [];
+      const geoTypes = [
+        new THREE.BoxGeometry(5, 5, 5),
+        new THREE.SphereGeometry(3, 32, 32),
+        new THREE.TorusGeometry(4, 1.5, 16, 100),
+        new THREE.IcosahedronGeometry(4),
+      ];
+
+      for (let i = 0; i < 50; i++) {
+        const geo = geoTypes[Math.floor(Math.random() * geoTypes.length)];
+        const mesh = new THREE.Mesh(geo, randomMat());
+        mesh.position.set(
+          (Math.random() - 0.5) * 100,
+          (Math.random() - 0.5) * 100,
+          (Math.random() - 0.5) * 100
+        );
+        mesh.rotation.set(
+          Math.random() * 2,
+          Math.random() * 2,
+          Math.random() * 2
+        );
+        scene.add(mesh);
+        // Save initial position after adding to scene
+        mesh.userData.initialPosition = mesh.position.clone();
+        shapes.push(mesh);
+      }
+
+      // Sacred Geometry: nested rotating tori + procedural sacred temple generator
+      const sacredGroup = new THREE.Group();
+      function regenerateTemple() {
+        // Remove all children
+        while (sacredGroup.children.length)
+          sacredGroup.remove(sacredGroup.children[0]);
+
+        // --- Dramatic GOD RAYS ---
+        const godRayCount = 6 + Math.floor(Math.random() * 4); // 6–9 rays
+        for (let i = 0; i < godRayCount; i++) {
+          const rayMaterial = new THREE.MeshBasicMaterial({
+            color: new THREE.Color().setHSL(Math.random(), 1, 0.5),
+            transparent: true,
+            opacity: 0.3 + Math.random() * 0.3,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            side: THREE.DoubleSide,
+          });
+          const cone = new THREE.Mesh(
+            new THREE.ConeGeometry(
+              4 + Math.random() * 4,
+              40 + Math.random() * 40,
+              64,
+              1,
+              true
+            ),
+            rayMaterial
+          );
+          cone.position.set(
+            Math.sin(i * 2) * 6,
+            Math.random() * 3 - 1.5,
+            Math.cos(i * 2) * 6
+          );
+          cone.rotation.x = Math.PI / 2;
+          cone.rotation.y = (i / godRayCount) * Math.PI * 2;
+          sacredGroup.add(cone);
+        }
+
+        // --- Dramatic Sacred Tori ---
+        const torusCount = 2 + Math.floor(Math.random() * 4); // 2–5 tori
+        for (let i = 0; i < torusCount; i++) {
+          const torus = new THREE.Mesh(
+            new THREE.TorusGeometry(
+              10 + i * 2 + Math.random() * 5,
+              0.5 + Math.random() * 1.5,
+              16,
+              100
+            ),
+            new THREE.MeshStandardMaterial({
+              color: new THREE.Color().setHSL(Math.random(), 1, 0.6),
+              metalness: 1,
+              roughness: 0.1,
+              emissive: new THREE.Color().setHSL(Math.random(), 1, 0.3),
+            })
+          );
+          torus.rotation.x = (i * Math.PI) / (2 + Math.random());
+          torus.rotation.y = Math.random() * Math.PI * 2;
+          torus.rotation.z = Math.random() * Math.PI * 2;
+          torus.scale.setScalar(0.8 + Math.random() * 1.5);
+          sacredGroup.add(torus);
+          // Store original vertices for mutation
+          torus.userData.originalVertices =
+            torus.geometry.attributes.position.array.slice();
+        }
+
+        // --- Dramatic, varied Tetrahedrons ---
+        for (let i = 0; i < 10 + Math.floor(Math.random() * 10); i++) {
+          const geo = new THREE.TetrahedronGeometry(2 + Math.random() * 2);
+          const mat = new THREE.MeshStandardMaterial({
+            color: new THREE.Color().setHSL(Math.random(), 1, 0.6),
+            metalness: 0.6,
+            roughness: 0.3,
+            emissive: new THREE.Color().setHSL(Math.random(), 1, 0.3),
+          });
+          const mesh = new THREE.Mesh(geo, mat);
+          mesh.position.set(
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20
+          );
+          mesh.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+          );
+          sacredGroup.add(mesh);
+          // Store original vertices for mutation
+          mesh.userData.originalVertices =
+            mesh.geometry.attributes.position.array.slice();
+        }
+
+        // --- Spiked Sacred Forms ---
+        for (let i = 0; i < 4 + Math.floor(Math.random() * 4); i++) {
+          const spike = new THREE.Mesh(
+            new THREE.ConeGeometry(
+              1 + Math.random(),
+              10 + Math.random() * 20,
+              8
+            ),
+            new THREE.MeshStandardMaterial({
+              color: new THREE.Color().setHSL(Math.random(), 1, 0.5),
+              emissive: new THREE.Color().setHSL(Math.random(), 1, 0.3),
+              metalness: 0.7,
+              roughness: 0.25,
+            })
+          );
+          spike.position.set(
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20,
+            (Math.random() - 0.5) * 20
+          );
+          spike.rotation.set(
+            Math.random() * Math.PI,
+            Math.random() * Math.PI,
+            Math.random() * Math.PI
+          );
+          sacredGroup.add(spike);
+          spike.userData.originalVertices =
+            spike.geometry.attributes.position.array.slice();
+        }
+      }
+      regenerateTemple();
+      scene.add(sacredGroup);
+      window.addEventListener("keydown", (e) => {
+        if (e.key === "z") regenerateTemple();
+      });
+
+      const planets = [];
+      const orbitLines = new THREE.Group();
+      for (let i = 0; i < 5; i++) {
+        const radius = 20 + i * 10;
+        const angle = Math.random() * Math.PI * 2;
+
+        const planet = new THREE.Mesh(
+          new THREE.SphereGeometry(1.5, 16, 16),
+          new THREE.MeshStandardMaterial({
+            color: new THREE.Color().setHSL(Math.random(), 1, 0.5),
+          })
+        );
+        planet.userData = {
+          radius,
+          angle,
+          speed: 0.001 + Math.random() * 0.002,
+        };
+        planets.push(planet);
+        scene.add(planet);
+
+        const curve = new THREE.EllipseCurve(
+          0,
+          0,
+          radius,
+          radius,
+          0,
+          2 * Math.PI,
+          false,
+          0
+        );
+        const points = curve
+          .getPoints(64)
+          .map((p) => new THREE.Vector3(p.x, 0, p.y));
+        const orbitGeo = new THREE.BufferGeometry().setFromPoints(points);
+        const orbitLine = new THREE.LineLoop(
+          orbitGeo,
+          new THREE.LineBasicMaterial({
+            color: 0x00ffff,
+            opacity: 0.5,
+            transparent: true,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          })
+        );
+        orbitLines.add(orbitLine);
+      }
+      scene.add(orbitLines);
+
+      // --- Comet Trails for Planets ---
+      const cometTrailLength = 20;
+      const cometTrailData = planets.map(() => []);
+      const cometTrailPositions = new Float32Array(
+        planets.length * cometTrailLength * 3
+      );
+      const cometTrails = new THREE.LineSegments(
+        new THREE.BufferGeometry().setAttribute(
+          "position",
+          new THREE.BufferAttribute(cometTrailPositions, 3)
+        ),
+        new THREE.LineBasicMaterial({
+          color: 0xffccff,
+          transparent: true,
+          opacity: 0.5,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      scene.add(cometTrails);
+      let trailsEnabled = true;
+      // --- Central Spiral Vortex ---
+      const vortexGeo = new THREE.RingGeometry(1, 15, 64);
+      const vortexMat = new THREE.MeshBasicMaterial({
+        color: 0x9933ff,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.25,
+      });
+      const vortex = new THREE.Mesh(vortexGeo, vortexMat);
+      vortex.rotation.x = Math.PI / 2;
+      vortex.position.y = -5;
+      scene.add(vortex);
+
+      // --- Orbiting Glyphs around Sacred Group ---
+      const runeTexture = new THREE.TextureLoader().load(
+        "https://threejs.org/examples/textures/sprites/disc.png"
+      );
+      const runeMat = new THREE.SpriteMaterial({
+        map: runeTexture,
+        color: 0xff00ff,
+      });
+      const glyphs = [];
+      for (let i = 0; i < 12; i++) {
+        const sprite = new THREE.Sprite(runeMat.clone());
+        sprite.scale.set(5, 5, 1);
+        scene.add(sprite);
+        glyphs.push({ sprite, angle: i * ((Math.PI * 2) / 12), radius: 25 });
+      }
+
+      // --- Mirrored Reflective Floor ---
+      const floorMat = new THREE.MeshPhongMaterial({
+        color: 0x111122,
+        shininess: 100,
+        specular: 0x888888,
+        opacity: 0.4,
+        transparent: true,
+      });
+      const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), floorMat);
+      floor.rotation.x = -Math.PI / 2;
+      floor.position.y = -20;
+      scene.add(floor);
+
+      const glassMat = new THREE.MeshPhysicalMaterial({
+        color: 0x88ccff,
+        metalness: 0.25,
+        roughness: 0,
+        transmission: 1,
+        thickness: 5,
+        clearcoat: 1,
+        clearcoatRoughness: 0,
+        opacity: 1,
+        transparent: true,
+      });
+
+      const glassSphere = new THREE.Mesh(
+        new THREE.SphereGeometry(6, 64, 64),
+        glassMat
+      );
+      glassSphere.position.set(0, 0, -25);
+      scene.add(glassSphere);
+
+      for (let i = 0; i < 8; i++) {
+        const rune = new THREE.Sprite(runeMat.clone());
+        rune.scale.set(10, 10, 1);
+        rune.position.set(
+          Math.sin(i) * 40,
+          Math.cos(i) * 40,
+          Math.sin(i * 2) * 20
+        );
+        scene.add(rune);
+      }
+
+      const helixGeo = new THREE.BufferGeometry();
+      const helixVerts = [];
+      for (let i = 0; i < 200; i++) {
+        let t = i / 10;
+        helixVerts.push(Math.cos(t) * 8, (i - 100) * 0.2, Math.sin(t) * 8);
+      }
+      helixGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(helixVerts, 3)
+      );
+      const helixMat = new THREE.LineBasicMaterial({ color: 0xff99ff });
+      const helix = new THREE.Line(helixGeo, helixMat);
+      scene.add(helix);
+
+      const starGeo = new THREE.BufferGeometry();
+      const starCount = 500;
+      const starPos = [];
+
+      for (let i = 0; i < starCount; i++) {
+        starPos.push(
+          (Math.random() - 0.5) * 200,
+          (Math.random() - 0.5) * 200,
+          (Math.random() - 0.5) * 200
+        );
+      }
+
+      starGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(starPos, 3)
+      );
+      const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1 });
+      const stars = new THREE.Points(starGeo, starMat);
+      scene.add(stars);
+
+      const glitterGeo = new THREE.BufferGeometry();
+      const glitterCount = 1000;
+      const glitterPositions = [];
+      const glitterColors = [];
+
+      for (let i = 0; i < glitterCount; i++) {
+        glitterPositions.push(
+          (Math.random() - 0.5) * 200,
+          (Math.random() - 0.5) * 200,
+          (Math.random() - 0.5) * 200
+        );
+        glitterColors.push(Math.random(), Math.random(), Math.random());
+      }
+
+      glitterGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(glitterPositions, 3)
+      );
+      glitterGeo.setAttribute(
+        "color",
+        new THREE.Float32BufferAttribute(glitterColors, 3)
+      );
+
+      const glitterMat = new THREE.PointsMaterial({
+        size: 2,
+        vertexColors: true,
+        transparent: true,
+        opacity: 0.9,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+
+      const glitter = new THREE.Points(glitterGeo, glitterMat);
+      scene.add(glitter);
+
+      // Flowing water-like effect: blue transparent particles
+      const waterGeo = new THREE.BufferGeometry();
+      const waterParticles = [];
+      for (let i = 0; i < 800; i++) {
+        waterParticles.push(
+          (Math.random() - 0.5) * 300,
+          (Math.random() - 0.5) * 300,
+          (Math.random() - 0.5) * 300
+        );
+      }
+      waterGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(waterParticles, 3)
+      );
+      const waterMat = new THREE.PointsMaterial({
+        color: 0x3399ff,
+        size: 1.5,
+        transparent: true,
+        opacity: 0.2,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const waterFlow = new THREE.Points(waterGeo, waterMat);
+      scene.add(waterFlow);
+
+      const spaceTexture = new THREE.TextureLoader().load(
+        "https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/cube/MilkyWay/dark-s_px.jpg"
+      );
+      const skySphere = new THREE.Mesh(
+        new THREE.SphereGeometry(1000, 64, 64),
+        new THREE.MeshBasicMaterial({ map: spaceTexture, side: THREE.BackSide })
+      );
+      scene.add(skySphere);
+
+      // --- Explosion sound, sparks, and camera shake ---
+      const explosionSound = new Audio(
+        "https://cdn.jsdelivr.net/gh/matfire/demos/sounds/explosion.mp3"
+      );
+
+      const sparkGeo = new THREE.BufferGeometry();
+      const sparkCount = 300;
+      const sparkPositions = [];
+      const sparkVelocities = [];
+      for (let i = 0; i < sparkCount; i++) {
+        sparkPositions.push(0, 0, 0);
+        sparkVelocities.push(
+          (Math.random() - 0.5) * 4,
+          (Math.random() - 0.5) * 4,
+          (Math.random() - 0.5) * 4
+        );
+      }
+      sparkGeo.setAttribute(
+        "position",
+        new THREE.Float32BufferAttribute(sparkPositions, 3)
+      );
+      const sparkMat = new THREE.PointsMaterial({
+        color: 0xffcc00,
+        size: 2,
+        transparent: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+      });
+      const sparks = new THREE.Points(sparkGeo, sparkMat);
+      scene.add(sparks);
+      let sparkActive = false;
+
+      // --- Smoke and glitter burst variables ---
+      let smoke,
+        smokeGeo,
+        smokeVel,
+        smokeParticles,
+        smokeActive = false;
+      let glitterBurst,
+        glitterBurstGeo,
+        glitterBurstVel,
+        glitterBurstParticles,
+        glitterBurstActive = false;
+
+      // --- Glitch Pass (subtle, momentary, controlled by glitchMode) ---
+      // We define glitchPass here so it's available to animate().
+      glitchPass = new THREE.GlitchPass();
+      glitchPass.goWild = false;
+      glitchPass.enabled = false;
+      glitchPass.renderToScreen = false;
+      composer.addPass(glitchPass);
+
+      glitchPass.material.uniforms["amount"].value = 0.05;
+      glitchPass.material.uniforms["angle"].value = 0.3;
+      glitchPass.material.uniforms["seed"].value = 0.4;
+      glitchPass.material.uniforms["distortion_x"].value = 1.2;
+      glitchPass.material.uniforms["distortion_y"].value = 0.8;
+      glitchPass.material.uniforms["col_s"].value = 0.002;
+
+      function animate() {
+        tiltAngle += (targetTiltAngle - tiltAngle) * 0.1;
+        yawAngle += (targetYawAngle - yawAngle) * 0.1;
+        requestAnimationFrame(animate);
+        
+        sacredGroup.rotation.x = tiltAngle;
+        sacredGroup.rotation.y = yawAngle;
+        // --- SacredGroup Y rotation with inverse ring behavior ---
+        sacredGroup.rotation.y += (targetTiltAngle - tiltAngle) * 0.5;
+
+        sacredGroup.children.forEach((child, index) => {
+          if (child.geometry && child.geometry.type === "TorusGeometry") {
+            child.rotation.z += (index % 2 === 0 ? 1 : -1) * 0.01;
+          }
+        });
+        shapes.forEach((shape, i) => {
+          shape.rotation.x += 0.002 + i * 0.0001;
+          shape.rotation.y += 0.003 + i * 0.0001;
+        });
+
+        if (Math.floor(Date.now() / 5000) % 2 === 0) {
+          shapes.forEach((mesh) => (mesh.material.wireframe = true));
+        } else {
+          shapes.forEach((mesh) => (mesh.material.wireframe = false));
+        }
+
+        sacredGroup.rotation.y += 0.002;
+        sacredGroup.rotation.z += 0.001;
+        // --- Sacred geometry mutation: vertex displacement animation ---
+        sacredGroup.children.forEach((child) => {
+          if (child.geometry && child.geometry.attributes.position) {
+            const pos = child.geometry.attributes.position;
+            const orig = child.userData.originalVertices;
+            if (orig) {
+              for (let i = 0; i < pos.count; i++) {
+                pos.setX(
+                  i,
+                  orig[i * 3] + Math.sin(Date.now() * 0.001 + i) * 0.2
+                );
+                pos.setY(
+                  i,
+                  orig[i * 3 + 1] + Math.cos(Date.now() * 0.001 + i) * 0.2
+                );
+                pos.setZ(
+                  i,
+                  orig[i * 3 + 2] + Math.sin(Date.now() * 0.001 + i) * 0.2
+                );
+              }
+              pos.needsUpdate = true;
+            }
+          }
+        });
+
+        // --- Simple Camera Pulse Animation ---
+        camera.position.y = Math.sin(Date.now() * 0.001) * 0.5;
+        // --- Meteor Shower Animation ---
+        const mp = meteorGeo.attributes.position.array;
+        for (let i = 0; i < meteorCount; i++) {
+          mp[i * 3 + 1] += meteorVel[i * 3 + 1];
+          if (mp[i * 3 + 1] < -100) mp[i * 3 + 1] = Math.random() * 100 + 100;
+        }
+        meteorGeo.attributes.position.needsUpdate = true;
+
+        // Animate orbiting glyphs
+        glyphs.forEach((g) => {
+          g.angle += 0.002;
+          g.sprite.position.set(
+            Math.cos(g.angle) * g.radius,
+            10,
+            Math.sin(g.angle) * g.radius
+          );
+        });
+
+        planets.forEach((p) => {
+          p.userData.angle += p.userData.speed;
+          p.position.set(
+            Math.cos(p.userData.angle) * p.userData.radius,
+            0,
+            Math.sin(p.userData.angle) * p.userData.radius
+          );
+        });
+
+        // --- Animate Comet Trails ---
+        if (trailsEnabled) {
+          for (let i = 0; i < planets.length; i++) {
+            cometTrailData[i].push(planets[i].position.clone());
+            if (cometTrailData[i].length > cometTrailLength) {
+              cometTrailData[i].shift();
+            }
+            const trail = cometTrailData[i];
+            for (let j = 0; j < cometTrailLength; j++) {
+              const idx = (i * cometTrailLength + j) * 3;
+              if (j < trail.length) {
+                // Exaggerate the trail by increasing distance from center
+                const exaggerated = trail[j].clone().multiplyScalar(1.5);
+                cometTrailPositions[idx] = exaggerated.x;
+                cometTrailPositions[idx + 1] = exaggerated.y;
+                cometTrailPositions[idx + 2] = exaggerated.z;
+              } else {
+                cometTrailPositions[idx] = 0;
+                cometTrailPositions[idx + 1] = 0;
+                cometTrailPositions[idx + 2] = 0;
+              }
+            }
+          }
+          cometTrails.geometry.attributes.position.needsUpdate = true;
+        }
+
+        colorLights.forEach((light) => {
+          light.color.setHSL(Math.random(), 1, 0.5);
+          light.intensity = 1 + Math.sin(Date.now() * 0.001) * 0.5;
+        });
+
+        // Animate fisheye intensity
+        if (fisheyePass.enabled) {
+          fisheyePass.uniforms.strength.value =
+            0.4 + Math.sin(Date.now() * 0.001) * 0.2;
+        }
+
+        // Animate wormhole shader time
+        if (wormholePass.enabled) {
+          wormholePass.uniforms.time.value += 0.01;
+        }
+
+        // --- Camera mode logic: Enable OrbitControls only in orbit mode ---
+        if (cameraMode === "orbit") {
+          controls.enabled = true;
+          controls.update();
+        }
+
+        if (cameraMode === "zoom") {
+          // Cinematic zoom: new dynamic X, Y, Z navigation
+          const t = Date.now() * 0.0005;
+          camera.position.set(
+            Math.cos(t) * 80,
+            Math.sin(t * 0.7) * 30,
+            Math.sin(t) * 80
+          );
+          camera.lookAt(scene.position);
+        } else if (cameraMode === "top") {
+          // Top-down orbital glide: dynamic X, Y, Z
+          const t = Date.now() * 0.0003;
+          const radius = 60 + Math.sin(t * 2.0) * 20;
+          camera.position.set(
+            Math.cos(t) * radius,
+            40 + Math.sin(t * 1.5) * 20,
+            Math.sin(t) * radius
+          );
+          camera.lookAt(scene.position);
+        }
+
+        // --- Spark particles ---
+        if (sparkActive) {
+          for (let i = 0; i < sparkCount; i++) {
+            let x =
+              sparkGeo.attributes.position.getX(i) +
+              sparkVelocities[i * 3 + 0] * 0.1;
+            let y =
+              sparkGeo.attributes.position.getY(i) +
+              sparkVelocities[i * 3 + 1] * 0.1;
+            let z =
+              sparkGeo.attributes.position.getZ(i) +
+              sparkVelocities[i * 3 + 2] * 0.1;
+            sparkGeo.attributes.position.setXYZ(i, x, y, z);
+            sparkVelocities[i * 3 + 0] *= 0.94;
+            sparkVelocities[i * 3 + 1] *= 0.94;
+            sparkVelocities[i * 3 + 2] *= 0.94;
+          }
+          sparkGeo.attributes.position.needsUpdate = true;
+        }
+
+        // --- Smoke animation ---
+        if (smokeActive && smokeGeo && smokeVel) {
+          const pos = smokeGeo.attributes.position.array;
+          for (let i = 0; i < smokeParticles; i++) {
+            pos[i * 3 + 0] += smokeVel[i * 3 + 0] * 0.1;
+            pos[i * 3 + 1] += smokeVel[i * 3 + 1] * 0.1;
+            pos[i * 3 + 2] += smokeVel[i * 3 + 2] * 0.1;
+            smokeVel[i * 3 + 0] *= 0.96;
+            smokeVel[i * 3 + 1] *= 0.96;
+            smokeVel[i * 3 + 2] *= 0.96;
+          }
+          smokeGeo.attributes.position.needsUpdate = true;
+        }
+
+        // --- Glitter burst animation ---
+        if (glitterBurstActive && glitterBurstGeo && glitterBurstVel) {
+          const pos = glitterBurstGeo.attributes.position.array;
+          for (let i = 0; i < glitterBurstParticles; i++) {
+            pos[i * 3 + 0] += glitterBurstVel[i * 3 + 0] * 0.13;
+            pos[i * 3 + 1] += glitterBurstVel[i * 3 + 1] * 0.13;
+            pos[i * 3 + 2] += glitterBurstVel[i * 3 + 2] * 0.13;
+            glitterBurstVel[i * 3 + 0] *= 0.93;
+            glitterBurstVel[i * 3 + 1] *= 0.93;
+            glitterBurstVel[i * 3 + 2] *= 0.93;
+          }
+          glitterBurstGeo.attributes.position.needsUpdate = true;
+        }
+
+        // --- Camera shake REMOVED ---
+        // if (Date.now() % 500 < 100 && sparkActive) {
+        //   camera.position.x += (Math.random() - 0.5) * 2;
+        //   camera.position.y += (Math.random() - 0.5) * 2;
+        // }
+
+        controls.update();
+        composer.render();
+        glitter.rotation.y += 0.002;
+        glitter.rotation.x += 0.001;
+        // Animate the water flow effect
+        waterFlow.rotation.y += 0.001;
+        waterFlow.rotation.x += 0.0005;
+
+        skySphere.rotation.y += 0.0005;
+
+        // Animate vortex spiral
+        vortex.rotation.z += 0.002;
+
+        orbitLines.rotation.x = tiltAngle;
+orbitLines.rotation.y = yawAngle;
+
+        const camModeLabel = document.getElementById("camMode");
+        if (camModeLabel) camModeLabel.textContent = cameraMode;
+      }
+
+      // --- Explosion effect ---
+      function triggerExplosion() {
+        explosionSound.play();
+        shapes.forEach((mesh, i) => {
+          const dir = new THREE.Vector3(
+            Math.random() - 0.5,
+            Math.random() - 0.5,
+            Math.random() - 0.5
+          )
+            .normalize()
+            .multiplyScalar(2);
+          mesh.userData.velocity = dir;
+        });
+
+        // initialize spark velocities and reset positions
+        for (let i = 0; i < sparkCount; i++) {
+          sparkGeo.attributes.position.setXYZ(i, 0, 0, 0);
+        }
+        sparkGeo.attributes.position.needsUpdate = true;
+        sparkActive = true;
+
+        // --- Glitter burst ---
+        {
+          glitterBurstParticles = 300;
+          const glitterBurstPos = [];
+          glitterBurstVel = [];
+          const glitterBurstColors = [];
+          for (let i = 0; i < glitterBurstParticles; i++) {
+            glitterBurstPos.push(0, 0, 0);
+            glitterBurstVel.push(
+              (Math.random() - 0.5) * 3.5,
+              (Math.random() - 0.5) * 3.5,
+              (Math.random() - 0.5) * 3.5
+            );
+            glitterBurstColors.push(
+              Math.random(),
+              Math.random(),
+              Math.random()
+            );
+          }
+          glitterBurstGeo = new THREE.BufferGeometry();
+          glitterBurstGeo.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(glitterBurstPos, 3)
+          );
+          glitterBurstGeo.setAttribute(
+            "color",
+            new THREE.Float32BufferAttribute(glitterBurstColors, 3)
+          );
+          const glitterBurstMat = new THREE.PointsMaterial({
+            size: 3.5,
+            vertexColors: true,
+            transparent: true,
+            opacity: 1,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          });
+          glitterBurst = new THREE.Points(glitterBurstGeo, glitterBurstMat);
+          scene.add(glitterBurst);
+          glitterBurstActive = true;
+          // Remove after 1.2s
+          setTimeout(() => {
+            if (glitterBurst) {
+              scene.remove(glitterBurst);
+              glitterBurst = null;
+              glitterBurstGeo = null;
+              glitterBurstVel = null;
+              glitterBurstActive = false;
+            }
+          }, 1200);
+        }
+
+        // --- Smoke burst ---
+        {
+          smokeGeo = new THREE.BufferGeometry();
+          smokeParticles = 200;
+          const smokePos = [];
+          smokeVel = [];
+          for (let i = 0; i < smokeParticles; i++) {
+            smokePos.push(0, 0, 0);
+            smokeVel.push(
+              (Math.random() - 0.5) * 1.2,
+              (Math.random() - 0.5) * 1.2,
+              (Math.random() - 0.5) * 1.2
+            );
+          }
+          smokeGeo.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(smokePos, 3)
+          );
+          const smokeMat = new THREE.PointsMaterial({
+            color: 0x555555,
+            size: 4,
+            transparent: true,
+            opacity: 0.3,
+            blending: THREE.NormalBlending,
+            depthWrite: false,
+          });
+          smoke = new THREE.Points(smokeGeo, smokeMat);
+          scene.add(smoke);
+          smokeActive = true;
+          // Remove after 1.8s
+          setTimeout(() => {
+            if (smoke) {
+              scene.remove(smoke);
+              smoke = null;
+              smokeGeo = null;
+              smokeVel = null;
+              smokeActive = false;
+            }
+          }, 1800);
+        }
+
+        let explosionTime = Date.now();
+        const explosionDuration = 1500;
+
+        function explodeStep() {
+          const elapsed = Date.now() - explosionTime;
+          if (elapsed < explosionDuration) {
+            shapes.forEach((mesh) => {
+              if (mesh.userData.velocity) {
+                mesh.position.add(mesh.userData.velocity);
+                mesh.userData.velocity.multiplyScalar(0.95);
+              }
+            });
+            requestAnimationFrame(explodeStep);
+          } else {
+            shapes.forEach((mesh) => {
+              delete mesh.userData.velocity;
+            });
+          }
+        }
+        explodeStep();
+      }
+
+      // --- Repel Explosion effect ---
+      function triggerRepelExplosion() {
+        shapes.forEach((mesh) => {
+          const dir = mesh.position.clone().normalize().multiplyScalar(2);
+          mesh.userData.velocity = dir;
+          mesh.userData.originalPosition = mesh.position.clone();
+
+          // Create particle burst for each mesh
+          const particleGeo = new THREE.BufferGeometry();
+          const particleCount = 30;
+          const particlePos = [];
+          const particleVel = [];
+          for (let j = 0; j < particleCount; j++) {
+            particlePos.push(mesh.position.x, mesh.position.y, mesh.position.z);
+            particleVel.push(
+              (Math.random() - 0.5) * 2,
+              (Math.random() - 0.5) * 2,
+              (Math.random() - 0.5) * 2
+            );
+          }
+          particleGeo.setAttribute("position", new THREE.Float32BufferAttribute(particlePos, 3));
+          const particleMat = new THREE.PointsMaterial({
+            color: 0xff6699,
+            size: 2,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+          });
+          const burst = new THREE.Points(particleGeo, particleMat);
+          scene.add(burst);
+
+          let t = 0;
+          function animateParticles() {
+            const posAttr = particleGeo.attributes.position;
+            for (let j = 0; j < particleCount; j++) {
+              let i3 = j * 3;
+              posAttr.setXYZ(
+                j,
+                posAttr.getX(j) + particleVel[i3] * 0.1,
+                posAttr.getY(j) + particleVel[i3 + 1] * 0.1,
+                posAttr.getZ(j) + particleVel[i3 + 2] * 0.1
+              );
+              particleVel[i3] *= 0.92;
+              particleVel[i3 + 1] *= 0.92;
+              particleVel[i3 + 2] *= 0.92;
+            }
+            posAttr.needsUpdate = true;
+            if (t++ < 40) requestAnimationFrame(animateParticles);
+            else scene.remove(burst);
+          }
+          animateParticles();
+        });
+
+        let startTime = Date.now();
+        const duration = 2000;
+
+        function repelStep() {
+          const elapsed = Date.now() - startTime;
+          const progress = elapsed / duration;
+
+          if (progress < 0.5) {
+            shapes.forEach((mesh) => {
+              if (mesh.userData.velocity) {
+                mesh.position.add(mesh.userData.velocity.clone().multiplyScalar(0.1));
+                mesh.userData.velocity.multiplyScalar(0.9);
+              }
+            });
+          } else if (progress < 1) {
+            shapes.forEach((mesh) => {
+              if (mesh.userData.originalPosition) {
+                mesh.position.lerp(mesh.userData.originalPosition, 0.05);
+              }
+            });
+          } else {
+            shapes.forEach((mesh) => {
+              delete mesh.userData.velocity;
+              delete mesh.userData.originalPosition;
+            });
+            return;
+          }
+
+          requestAnimationFrame(repelStep);
+        }
+
+        repelStep();
+      }
+
+
+      animate();
+
+      window.addEventListener("resize", () => {
+        camera.aspect = window.innerWidth / window.innerHeight;
+        camera.updateProjectionMatrix();
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        composer.setSize(window.innerWidth, window.innerHeight);
+      });
+      // --- Zoom Fractal-Style Shader Distortion Toggle (wormholePass) ---
+      // See wormholePass above, toggle with 'v'
+
+      // --- REMOVE on-screen glitch toggle button event logic ---
+      // (Removed per instructions)
+    </script>
+  </body>
+</html>
