@@ -4,6 +4,10 @@
   <head>
     <base href="." />
     <meta charset="UTF-8" />
+    <meta
+      name="viewport"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
+    />
     <title>Insane 3D Visualizer</title>
     <style>
       html,
@@ -22,19 +26,16 @@
         user-select: text;
         touch-action: manipulation;
       }
-      @media (max-width: 767px) {
-        #hud-buttons button {
-          padding: 4vh 5vw !important;
-          font-size: 4vw !important;
-          border-radius: 2vw !important;
-        }
+      body.mobile #hud-buttons button {
+        /* padding: 6px 10px !important; */
+        /* font-size: 12px !important; */
+        border-radius: 4px !important;
+        opacity: 0.9;
       }
-      @media (min-width: 768px) {
-        #hud-buttons button {
-          padding: 6px 10px !important;
-          font-size: 12px !important;
-          border-radius: 4px !important;
-        }
+      body:not(.mobile) #hud-buttons button {
+        padding: 6px 10px !important;
+        font-size: 12px !important;
+        border-radius: 4px !important;
       }
     </style>
   </head>
@@ -43,7 +44,7 @@
     id="glitchIndicator"
     style="
       position: fixed;
-      top: 60px;
+      top: 100px;
       right: 10px;
       padding: 4px 8px;
       font-family: monospace;
@@ -78,6 +79,27 @@
 
     <!-- Insert HUD buttons dynamically based on screen size and device -->
     <script>
+      window.addEventListener("load", () => {
+        setTimeout(() => {
+          window.scrollTo(0, 1); // Trigger mobile browser to hide nav bar
+        }, 100);
+      });
+      function detectMobileMode() {
+        const isSmallScreen = window.innerWidth <= 1024;
+        console.log(
+          "Applying mobile mode:",
+          isSmallScreen,
+          "| Width:",
+          window.innerWidth
+        );
+        document.body.classList.toggle("mobile", isSmallScreen);
+        if (typeof renderHUDButtons === "function") renderHUDButtons();
+      }
+      window.addEventListener("resize", detectMobileMode);
+      window.addEventListener("DOMContentLoaded", () => {
+        setTimeout(detectMobileMode, 100); // Delay to ensure correct screen size on load
+      });
+
       function renderHUDButtons() {
         const hud = document.getElementById("hud");
         const controlMap = document.getElementById("controlMap");
@@ -114,7 +136,8 @@
           controls.forEach((control) => {
             const btn = document.createElement("button");
             btn.textContent = control.label;
-            btn.style.cssText = "margin:4px;background:rgba(255,255,255,0.1);color:white;border:1px solid white;";
+            btn.style.cssText =
+              "margin:4px;background:rgba(255,255,255,0.1);color:white;border:1px solid white;";
             btn.dataset.key = control.key;
             buttonMap[control.key] = btn;
             if (control.key === "g") {
@@ -148,8 +171,11 @@
               });
             } else {
               btn.addEventListener("click", () => {
-                window.dispatchEvent(new KeyboardEvent("keydown", { key: control.key }));
-                if (["1", "2", "3"].includes(control.key)) activeViewKey = control.key;
+                window.dispatchEvent(
+                  new KeyboardEvent("keydown", { key: control.key })
+                );
+                if (["1", "2", "3"].includes(control.key))
+                  activeViewKey = control.key;
                 setButtonHighlight(control.key);
               });
             }
@@ -204,7 +230,62 @@
 
           hud.appendChild(buttonContainer);
         }
+        // --- Add hide/show Buttons logic for desktop only (after #hud-buttons inserted) ---
+        // Replace hideButtonsBtn logic: only append if not mobile (width > 1024)
+        if (!document.getElementById("hideButtonsBtn")) {
+          const hideBtn = document.createElement("button");
+          hideBtn.id = "hideButtonsBtn";
+          hideBtn.textContent = "Hide Buttons";
+          hideBtn.style.cssText =
+            "position:fixed;top:100px;left:10px;z-index:1001;padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
+          hideBtn.onclick = () => {
+            document.getElementById("hud-buttons").style.display = "none";
+            hideBtn.style.display = "none";
+            const showBtn = document.getElementById("showButtonsBtn");
+            if (showBtn) showBtn.style.display = "block";
+          };
+          // Only append the hide button if not mobile (width > 1024)
+          if (window.innerWidth > 1024) {
+            document.body.appendChild(hideBtn);
+          }
+        }
+        if (
+          !document.getElementById("showButtonsBtn") &&
+          !document.body.classList.contains("mobile")
+        ) {
+          const showBtn = document.createElement("button");
+          showBtn.id = "showButtonsBtn";
+          showBtn.textContent = "Show Buttons";
+          showBtn.style.cssText =
+            "position:fixed;top:100px;left:10px;z-index:1001;padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
+          showBtn.style.display = "none";
+          showBtn.onclick = () => {
+            document.getElementById("hud-buttons").style.display = "block";
+            showBtn.style.display = "none";
+            const hideBtn = document.getElementById("hideButtonsBtn");
+            if (hideBtn) hideBtn.style.display = "block";
+          };
+          document.body.appendChild(showBtn);
+        }
         if (controlMap) controlMap.style.display = "block";
+        // --- Add show HUD button on desktop only ---
+        if (
+          !document.getElementById("showHUDButton") &&
+          !document.body.classList.contains("mobile")
+        ) {
+          const showBtn = document.createElement("button");
+          showBtn.id = "showHUDButton";
+          showBtn.textContent = "Show HUD";
+          showBtn.style.cssText =
+            "position:fixed;top:140px;left:10px;z-index:1001;padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
+          showBtn.onclick = () => {
+            document.getElementById("controlMap").style.display = "block";
+            showBtn.style.display = "none";
+          };
+          showBtn.style.display = "none"; // default hidden
+          document.getElementById("controlMap").style.display = "block"; // ensure HUD is visible on load
+          document.body.appendChild(showBtn);
+        }
       }
 
       renderHUDButtons();
@@ -230,17 +311,32 @@
             controlMap.style.marginTop = "100px"; // move further below the buttons
             controlMap.style.borderRadius = "5px";
             controlMap.innerHTML = `
-              <strong>🖱 Mouse or Touch:</strong><br />
-              • Left Drag: Orbit<br />
-              • Scroll: Zoom<br />
-              • Right Drag: Pan<br />
-            `;
+    <strong><div style="text-align: right; margin-bottom: 5px;">
+      <button onclick="document.getElementById('controlMap').style.display='none'; document.getElementById('showHUDButton').style.display='block';" style="background: transparent; color: white; border: none; font-size: 14px; cursor: pointer;">✖</button>
+    </div>🖱 Mouse or Touch:</strong><br />
+    • Left Drag: Orbit<br />
+    • Scroll: Zoom<br />
+    • Right Drag: Pan<br /><br />
+    ${window.innerWidth <= 1024 ? `` : `
+    <strong>⌨️ Keyboard:</strong><br />
+    • [1/2/3]: View Modes<br />
+    • [R/H/B/P/Y/W/X]: Color Palettes<br />
+    • [C/D/N]: Contrast / Brightness / Invert<br />
+    • [F/V]: Fisheye / Wormhole<br />
+    • [E]: Scramble<br />
+    • [K/L]: Push / Pull<br />
+    • [Z]: Regenerate Temple<br />
+    • [Arrow Keys]: Tilt & Rotate<br />
+    • [G]: Hold to Glitch<br />
+    `}
+  `;
           }
           // Insert after HUD buttons
           const hud = document.getElementById("hud");
           const buttonContainer = document.getElementById("hud-buttons");
           if (hud && buttonContainer && controlMap.parentNode !== hud) {
-            if (controlMap.parentNode) controlMap.parentNode.removeChild(controlMap);
+            if (controlMap.parentNode)
+              controlMap.parentNode.removeChild(controlMap);
             if (buttonContainer.nextSibling) {
               hud.insertBefore(controlMap, buttonContainer.nextSibling);
             } else {
@@ -340,6 +436,7 @@
         size: 2,
         transparent: true,
         opacity: 0.6,
+        vertexColors: true,
       });
       const meteors = new THREE.Points(meteorGeo, meteorMat);
       // ----------------- END Meteor Shower Setup -----------------
@@ -604,7 +701,7 @@
       controls.mouseButtons = {
         LEFT: THREE.MOUSE.ROTATE,
         MIDDLE: THREE.MOUSE.DOLLY,
-        RIGHT: THREE.MOUSE.PAN
+        RIGHT: THREE.MOUSE.PAN,
       };
 
       let cameraMode = "orbit";
@@ -1228,11 +1325,11 @@
 
         // --- Camera mode logic: Enable OrbitControls only in orbit mode ---
         if (cameraMode === "orbit") {
-  controls.enabled = true;
-  controls.update(); // let OrbitControls handle all movement
-} else {
-  controls.enabled = false;
-}
+          controls.enabled = true;
+          controls.update(); // let OrbitControls handle all movement
+        } else {
+          controls.enabled = false;
+        }
 
         if (cameraMode === "zoom") {
           // Cinematic zoom: new dynamic X, Y, Z navigation
@@ -1329,7 +1426,7 @@
         if (camModeLabel) camModeLabel.textContent = cameraMode;
 
         // Animate camera y position unless in orbit mode
-        if (cameraMode !== 'orbit') {
+        if (cameraMode !== "orbit") {
           camera.position.y = Math.sin(Date.now() * 0.001) * 0.5;
         }
       }
@@ -1338,6 +1435,78 @@
       function triggerExplosion() {
         explosionSound.play();
         shapes.forEach((mesh, i) => {
+          // Particle burst per shape on explosion
+          const particleGeo = new THREE.BufferGeometry();
+          const particleCount = 30;
+          const particlePos = [];
+          const particleVel = [];
+          // --- Insert color array for per-particle coloring ---
+          const particleColors = [];
+
+          for (let j = 0; j < particleCount; j++) {
+            // Add random offset to spawn position (spread out further)
+            const offset = new THREE.Vector3(
+              (Math.random() - 0.5) * 6,
+              (Math.random() - 0.5) * 6,
+              (Math.random() - 0.5) * 6
+            );
+            const spawnPos = mesh.position.clone().add(offset);
+            particlePos.push(spawnPos.x, spawnPos.y, spawnPos.z);
+            particleVel.push(
+              (Math.random() - 0.5) * 2,
+              (Math.random() - 0.5) * 2,
+              (Math.random() - 0.5) * 2
+            );
+          }
+          // Insert HSL color generation for each particle
+          for (let j = 0; j < particleCount; j++) {
+            const hue = (j / particleCount + Math.random() * 0.1) % 1;
+            const color = new THREE.Color().setHSL(hue, 1.0, 0.6);
+            particleColors.push(color.r, color.g, color.b);
+          }
+
+          particleGeo.setAttribute(
+            "position",
+            new THREE.Float32BufferAttribute(particlePos, 3)
+          );
+          // Add color attribute to geometry
+          particleGeo.setAttribute(
+            "color",
+            new THREE.Float32BufferAttribute(particleColors, 3)
+          );
+
+          const particleMat = new THREE.PointsMaterial({
+            size: 2,
+            transparent: true,
+            opacity: 0.8,
+            blending: THREE.AdditiveBlending,
+            depthWrite: false,
+            vertexColors: true, // ✅ Vertex colors only — no static color!
+          });
+          const burst = new THREE.Points(particleGeo, particleMat);
+          scene.add(burst);
+
+          let t = 0;
+          function animateParticles() {
+            const posAttr = particleGeo.attributes.position;
+            for (let j = 0; j < particleCount; j++) {
+              let i3 = j * 3;
+              posAttr.setXYZ(
+                j,
+                posAttr.getX(j) + particleVel[i3] * 0.1,
+                posAttr.getY(j) + particleVel[i3 + 1] * 0.1,
+                posAttr.getZ(j) + particleVel[i3 + 2] * 0.1
+              );
+              particleVel[i3] *= 0.92;
+              particleVel[i3 + 1] *= 0.92;
+              particleVel[i3 + 2] *= 0.92;
+            }
+            posAttr.needsUpdate = true;
+            if (t++ < 60) requestAnimationFrame(animateParticles);
+            else scene.remove(burst);
+          }
+          animateParticles();
+
           const dir = new THREE.Vector3(
             Math.random() - 0.5,
             Math.random() - 0.5,
@@ -1472,36 +1641,53 @@
       // --- Repel Explosion effect ---
       function triggerRepelExplosion() {
         shapes.forEach((mesh) => {
-          // 1. Increase the initial repelling force:
           const dir = mesh.position.clone().normalize().multiplyScalar(10);
           mesh.userData.velocity = dir;
           mesh.userData.originalPosition = mesh.position.clone();
 
-          // Create particle burst for each mesh
           const particleGeo = new THREE.BufferGeometry();
-          const particleCount = 60;
+          const particleCount = 30;
           const particlePos = [];
           const particleVel = [];
+          const particleColors = [];
+
           for (let j = 0; j < particleCount; j++) {
-            particlePos.push(mesh.position.x, mesh.position.y, mesh.position.z);
+            // Add random offset to spawn position (spread out further)
+            const offset = new THREE.Vector3(
+              (Math.random() - 0.5) * 6,
+              (Math.random() - 0.5) * 6,
+              (Math.random() - 0.5) * 6
+            );
+            const spawnPos = mesh.position.clone().add(offset);
+            particlePos.push(spawnPos.x, spawnPos.y, spawnPos.z);
             particleVel.push(
               (Math.random() - 0.5) * 2,
               (Math.random() - 0.5) * 2,
               (Math.random() - 0.5) * 2
             );
+            const hue = (j / particleCount + Math.random() * 0.1) % 1;
+            const color = new THREE.Color().setHSL(hue, 1.0, 0.6);
+            particleColors.push(color.r, color.g, color.b);
           }
+
           particleGeo.setAttribute(
             "position",
             new THREE.Float32BufferAttribute(particlePos, 3)
           );
+          particleGeo.setAttribute(
+            "color",
+            new THREE.Float32BufferAttribute(particleColors, 3)
+          );
+
           const particleMat = new THREE.PointsMaterial({
-            color: 0xff6699,
             size: 2,
             transparent: true,
             opacity: 0.8,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
+            vertexColors: true
           });
+
           const burst = new THREE.Points(particleGeo, particleMat);
           scene.add(burst);
 
@@ -1509,7 +1695,7 @@
           function animateParticles() {
             const posAttr = particleGeo.attributes.position;
             for (let j = 0; j < particleCount; j++) {
-              let i3 = j * 3;
+              const i3 = j * 3;
               posAttr.setXYZ(
                 j,
                 posAttr.getX(j) + particleVel[i3] * 0.1,
@@ -1534,21 +1720,13 @@
           const elapsed = Date.now() - startTime;
           const progress = elapsed / duration;
 
-          // 3. Increase the number of animation frames for smoother retraction:
           if (progress < 0.6) {
             shapes.forEach((mesh) => {
               if (mesh.userData.velocity) {
                 mesh.position.add(
                   mesh.userData.velocity.clone().multiplyScalar(0.1)
                 );
-                // 2. Smooth the transition by reducing velocity decay:
                 mesh.userData.velocity.multiplyScalar(0.95);
-              }
-            });
-          } else if (progress < 1) {
-            shapes.forEach((mesh) => {
-              if (mesh.userData.originalPosition) {
-                mesh.position.lerp(mesh.userData.originalPosition, 0.05);
               }
             });
           } else {
@@ -1581,3 +1759,4 @@
     </script>
   </body>
 </html>
+i
