@@ -79,11 +79,6 @@
 
     <!-- Insert HUD buttons dynamically based on screen size and device -->
     <script>
-      window.addEventListener("load", () => {
-        setTimeout(() => {
-          window.scrollTo(0, 1); // Trigger mobile browser to hide nav bar
-        }, 100);
-      });
       function detectMobileMode() {
         const isSmallScreen = window.innerWidth <= 1024;
         console.log(
