@@ -79,6 +79,9 @@
 
     <!-- Insert HUD buttons dynamically based on screen size and device -->
     <script>
+
+let zoomVelocity = 0;
+let targetZoom = 30; // default zoom
       function detectMobileMode() {
         const isSmallScreen = window.innerWidth <= 1024;
         console.log(
@@ -305,14 +308,16 @@
             controlMap.style.zIndex = "500";
             controlMap.style.marginTop = "100px"; // move further below the buttons
             controlMap.style.borderRadius = "5px";
-            controlMap.innerHTML = `
+            let html = `
     <strong><div style="text-align: right; margin-bottom: 5px;">
       <button onclick="document.getElementById('controlMap').style.display='none'; document.getElementById('showHUDButton').style.display='block';" style="background: transparent; color: white; border: none; font-size: 14px; cursor: pointer;">✖</button>
     </div>🖱 Mouse or Touch:</strong><br />
     • Left Drag: Orbit<br />
     • Scroll: Zoom<br />
     • Right Drag: Pan<br /><br />
-    ${window.innerWidth <= 1024 ? `` : `
+  `;
+  if (window.innerWidth > 1024) {
+    html += `
     <strong>⌨️ Keyboard:</strong><br />
     • [1/2/3]: View Modes<br />
     • [R/H/B/P/Y/W/X]: Color Palettes<br />
@@ -323,8 +328,9 @@
     • [Z]: Regenerate Temple<br />
     • [Arrow Keys]: Tilt & Rotate<br />
     • [G]: Hold to Glitch<br />
-    `}
-  `;
+    `;
+  }
+  controlMap.innerHTML = html;
           }
           // Insert after HUD buttons
           const hud = document.getElementById("hud");
@@ -420,19 +426,24 @@
           Math.random() * 100 + 100,
           Math.random() * 200 - 100
         );
-        meteorVel.push(0, -0.5 - Math.random(), 0);
+        meteorVel.push(0, -0.15 - Math.random() * 0.2, 0);
       }
       meteorGeo.setAttribute(
         "position",
         new THREE.Float32BufferAttribute(meteorPos, 3)
       );
       const meteorMat = new THREE.PointsMaterial({
-        color: 0xffffff,
-        size: 2,
+        vertexColors: false,
+        size: 1,
+        color: new THREE.Color().setHSL(Math.random(), 1, 0.75),
         transparent: true,
-        opacity: 0.6,
-        vertexColors: true,
+        opacity: 0.8,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
       });
+      setInterval(() => {
+        meteorMat.color.setHSL(Math.random(), 1, 0.75);
+      }, 300);
       const meteors = new THREE.Points(meteorGeo, meteorMat);
       // ----------------- END Meteor Shower Setup -----------------
       const scene = new THREE.Scene();
@@ -472,7 +483,7 @@
       const fisheyeShader = {
         uniforms: {
           tDiffuse: { value: null },
-          strength: { value: 0.6 },
+          strength: { value: 0.1 },
         },
         vertexShader: `
         varying vec2 vUv;
@@ -487,10 +498,9 @@
         varying vec2 vUv;
         void main() {
           vec2 p = vUv * 2.0 - 1.0;
-          vec2 ovalP = vec2(p.x * 1.3, p.y); // horizontal stretch
-          float len = length(ovalP);
-          float blur = smoothstep(0.7, 1.0, len);
-          float factor = 1.0 + strength * len * len * (0.8 + blur * 0.8);
+          float len = length(p);
+          float distortion = smoothstep(0.4, 1.0, len); // distortion starts later, near the edge
+          float factor = 1.0 + strength * distortion * distortion * 2.0;
           vec2 uv = p / factor + 0.5;
           gl_FragColor = texture2D(tDiffuse, uv);
         }
@@ -526,6 +536,7 @@
               if (mesh.userData.initialPosition) {
                 mesh.position.copy(mesh.userData.initialPosition);
               }
+              delete mesh.userData.velocity; // Ensure no leftover velocity
             });
           }
         }
@@ -623,6 +634,22 @@
           case "3":
             cameraMode = "top";
             break;
+          case "[":
+            if (cameraMode !== "zoom") {
+              manualZoom -= 1.5;
+              manualZoom = Math.max(5, Math.min(150, manualZoom));
+            } else {
+              zoomVelocity = -0.8;
+            }
+            break;
+          case "]":
+            if (cameraMode !== "zoom") {
+              manualZoom += 1.5;
+              manualZoom = Math.max(5, Math.min(150, manualZoom));
+            } else {
+              zoomVelocity = 0.8;
+            }
+            break;
           case "f":
             fisheyePass.enabled = !fisheyePass.enabled;
             break;
@@ -639,14 +666,20 @@
             wormholePass.enabled = !wormholePass.enabled;
             break;
           // --- Keyboard zoom in/out ---
+          case "=": // zoom in
           case "+":
-          case "=": // for key next to backspace
-            if (cameraMode === "zoom") manualZoom = Math.max(5, manualZoom - 1);
+            zoomVelocity -= 0.08;
             break;
           case "-":
           case "_":
-            if (cameraMode === "zoom")
-              manualZoom = Math.min(100, manualZoom + 1);
+            zoomVelocity += 0.08;
+            break;
+          // --- Slower zoom velocity adjustment ---
+          case "[":
+            zoomVelocity -= 0.02; // slower zoom in
+            break;
+          case "]":
+            zoomVelocity += 0.02; // slower zoom out
             break;
           // --- Toggle control map panel ---
           case "?":
@@ -677,16 +710,31 @@
 
       const controls = new THREE.OrbitControls(camera, renderer.domElement);
       controls.enableDamping = true;
-      controls.dampingFactor = 0.08;
-      controls.rotateSpeed = 0.8;
+      controls.dampingFactor = 0.006; // Lower value for longer decay
+      controls.rotateSpeed = 0.6;     // Lower speed to give finer control
       controls.zoomSpeed = 1.0;
       controls.panSpeed = 0.5;
       // Ensure vertical rotation is enabled and zooming is not caused by vertical drag:
       controls.enableRotate = true;
       controls.enableZoom = true;
       controls.screenSpacePanning = false;
-      controls.minPolarAngle = 0.01;
-      controls.maxPolarAngle = Math.PI - 0.01;
+      // Allow unrestricted vertical rotation (polar angle):
+      controls.minPolarAngle = -Infinity;
+      controls.maxPolarAngle = Infinity;
+
+      // Override OrbitControls update method to safely clamp angles
+      const originalUpdate = controls.update.bind(controls);
+      controls.update = function () {
+        if (this.spherical) {
+          this.spherical.theta = (this.spherical.theta + 2 * Math.PI) % (2 * Math.PI);
+          this.spherical.phi = (this.spherical.phi + 2 * Math.PI) % (2 * Math.PI);
+        }
+        originalUpdate();
+      };
+
+      // Optionally, allow full azimuth rotation (horizontal orbit):
+      controls.minAzimuthAngle = -Infinity;
+      controls.maxAzimuthAngle = Infinity;
       // Set the initial target only once and avoid resetting it each frame
       if (!controls.hasSetTarget) {
         controls.target.set(0, 0, 0);
@@ -882,6 +930,13 @@
         if (e.key === "z") regenerateTemple();
       });
 
+
+window.addEventListener("wheel", (e) => {
+  if (cameraMode === "zoom") {
+    e.preventDefault(); // Prevent default page scroll
+    zoomVelocity += e.deltaY * 0.0002; // Adjust scale if needed (positive zooms out)
+  }
+}, { passive: false });
       const planets = [];
       const orbitLines = new THREE.Group();
       for (let i = 0; i < 5; i++) {
@@ -1203,8 +1258,7 @@
 
         sacredGroup.rotation.x = tiltAngle;
         sacredGroup.rotation.y = yawAngle;
-        // --- SacredGroup Y rotation with inverse ring behavior ---
-        sacredGroup.rotation.y += (targetTiltAngle - tiltAngle) * 0.5;
+        // Remove manual sacredGroup rotation override
 
         sacredGroup.children.forEach((child, index) => {
           if (child.geometry && child.geometry.type === "TorusGeometry") {
@@ -1254,7 +1308,11 @@
         const mp = meteorGeo.attributes.position.array;
         for (let i = 0; i < meteorCount; i++) {
           mp[i * 3 + 1] += meteorVel[i * 3 + 1];
-          if (mp[i * 3 + 1] < -100) mp[i * 3 + 1] = Math.random() * 100 + 100;
+          mp[i * 3 + 0] += Math.sin(Date.now() * 0.001 + i) * 0.05;
+          if (mp[i * 3 + 1] < -100) {
+            mp[i * 3 + 1] = Math.random() * 100 + 100;
+            mp[i * 3 + 0] = Math.random() * 200 - 100;
+          }
         }
         meteorGeo.attributes.position.needsUpdate = true;
 
@@ -1328,12 +1386,15 @@
         }
 
         if (cameraMode === "zoom") {
-          // Cinematic zoom: new dynamic X, Y, Z navigation
+          zoomVelocity *= 0.93; // slower decay for glide
+          manualZoom += zoomVelocity;
+          manualZoom = Math.max(5, Math.min(150, manualZoom)); // clamp zoom range
+
           const t = Date.now() * 0.0005;
           camera.position.set(
-            Math.cos(t) * 80,
-            Math.sin(t * 0.7) * 30,
-            Math.sin(t) * 80
+            Math.cos(t) * manualZoom,
+            Math.sin(t * 0.7) * manualZoom * 0.4,
+            Math.sin(t) * manualZoom
           );
           camera.lookAt(scene.position);
         } else if (cameraMode === "top") {
@@ -1403,6 +1464,7 @@
         // }
 
         controls.update();
+        controls.update();
         composer.render();
         glitter.rotation.y += 0.002;
         glitter.rotation.x += 0.001;
@@ -1433,7 +1495,7 @@
         shapes.forEach((mesh, i) => {
           // Particle burst per shape on explosion
           const particleGeo = new THREE.BufferGeometry();
-          const particleCount = 30;
+          const particleCount = 10;
           const particlePos = [];
           const particleVel = [];
           // --- Insert color array for per-particle coloring ---
@@ -1637,12 +1699,14 @@
       // --- Repel Explosion effect ---
       function triggerRepelExplosion() {
         shapes.forEach((mesh) => {
+          if (!mesh.userData.initialPosition) {
+            mesh.userData.initialPosition = mesh.position.clone();
+          }
           const dir = mesh.position.clone().normalize().multiplyScalar(10);
           mesh.userData.velocity = dir;
-          mesh.userData.originalPosition = mesh.position.clone();
 
           const particleGeo = new THREE.BufferGeometry();
-          const particleCount = 30;
+          const particleCount = 10;
           const particlePos = [];
           const particleVel = [];
           const particleColors = [];
@@ -1712,28 +1776,28 @@
         let startTime = Date.now();
         const duration = 2000;
 
+        // Repel movement: ramp up (ease-in) outward movement
         function repelStep() {
           const elapsed = Date.now() - startTime;
-          const progress = elapsed / duration;
+          const progress = Math.min(1, elapsed / duration);
 
-          if (progress < 0.6) {
-            shapes.forEach((mesh) => {
-              if (mesh.userData.velocity) {
-                mesh.position.add(
-                  mesh.userData.velocity.clone().multiplyScalar(0.1)
-                );
-                mesh.userData.velocity.multiplyScalar(0.95);
-              }
-            });
+          shapes.forEach((mesh) => {
+            if (mesh.userData.velocity) {
+              // Start slow, accelerate outward
+              const ramp = Math.pow(progress, 2); // ease-in
+              mesh.position.add(
+                mesh.userData.velocity.clone().multiplyScalar(0.08 * ramp)
+              );
+            }
+          });
+
+          if (progress < 1) {
+            requestAnimationFrame(repelStep);
           } else {
             shapes.forEach((mesh) => {
               delete mesh.userData.velocity;
-              delete mesh.userData.originalPosition;
             });
-            return;
           }
-
-          requestAnimationFrame(repelStep);
         }
 
         repelStep();
