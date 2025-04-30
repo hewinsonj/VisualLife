@@ -6,20 +6,29 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=overlays-content"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no"
     />
-    <title>Insane 3D Visualizer</title>
+    <title>VisualLife</title>
     <style>
       html,
       body {
         margin: 0;
+        padding: 0;
+        width: 100%;
+        height: 100%;
         overflow: hidden;
         background: #000;
-        touch-action: manipulation;
+        position: fixed;
+        top: 0;
+        left: 0;
+        -webkit-overflow-scrolling: touch;
+        overscroll-behavior: none;
+        touch-action: none;
       }
       canvas {
         display: block;
-        touch-action: manipulation;
+        width: 100vw;
+        height: 100vh;
       }
       button {
         -webkit-user-select: none; /* Safari */
@@ -97,6 +106,14 @@
         text-align: center;
         max-width: 600px;
         width: 90%;
+      }
+      /* Prevent selection and tap highlights on long press */
+      * {
+        -webkit-touch-callout: none; /* iOS Safari long press */
+        -webkit-user-select: none;   /* Safari */
+        -ms-user-select: none;       /* IE 10+ */
+        user-select: none;           /* Standard */
+        -webkit-tap-highlight-color: rgba(0, 0, 0, 0); /* Remove gray flash */
       }
     </style>
   </head>
@@ -278,7 +295,7 @@ function toggleRandomWireframes() {
             { key: "d", label: "Birghtness" },
             { key: "o", label: "Outline" },
             { key: "q", label: "Randomize Outlines" },
-            { key: "u", label: "Choppy Speed" },
+            // { key: "u", label: "Choppy Speed" },
             { key: "arrowLeft", label: "←" },
             { key: "arrowRight", label: "→" },
             { key: "arrowUp", label: "↑" },
@@ -294,6 +311,7 @@ function toggleRandomWireframes() {
               "margin:4px;background:rgba(255,255,255,0.1);color:white;border:1px solid white;";
             btn.dataset.key = control.key;
             buttonMap[control.key] = btn;
+            // Special toggles (that do NOT want rapid-fire)
             if (control.key === "g") {
               btn.addEventListener("click", () => {
                 glitchPass.enabled = !glitchPass.enabled;
@@ -323,51 +341,104 @@ function toggleRandomWireframes() {
                   : "rgba(255,255,255,0.1)";
                 setButtonHighlight(control.key);
               });
-            } else if (control.key === "o") {
-              btn.addEventListener("click", () => {
-                toggleWireframes();
-                randomWireframeEnabled = false; // deactivate random wireframes if Outline is selected
+            }
+            // For keys that use KeyboardEvent "keydown" (rapid-fire), including o, q, s, t, and arrows
+              if (
+                [
+                  "+", "-", "0", "1", "2", "3", "x", "r", "h", "b", "p", "y", "w",
+                  "e", "k", "l", "z", "c", "d", "arrowLeft", "arrowRight", "arrowUp", "arrowDown",
+                  // "u", // Choppy Speed button logic commented out
+                  "s", "t", "o", "q"
+                ].includes(control.key)
+              ) {
+              let pressTimer;
+              let isPressing = false;
 
-                if (btn.style.backgroundColor === "purple") {
-                  btn.style.backgroundColor = "rgba(255,255,255,0.1)";
-                  wireframeEnabled = false;
+              // For o, q, s, t, use their custom logic on keydown, but also allow rapid fire
+              const dispatchKey = () => {
+                // Custom logic for o, q, s, t, and arrow keys
+                if (control.key === "o") {
+                  toggleWireframes();
+                  randomWireframeEnabled = false; // deactivate random wireframes if Outline is selected
+                  if (btn.style.backgroundColor === "purple") {
+                    btn.style.backgroundColor = "rgba(255,255,255,0.1)";
+                    wireframeEnabled = false;
+                  } else {
+                    setButtonHighlight("o");
+                    wireframeEnabled = true;
+                  }
+                } else if (control.key === "q") {
+                  toggleRandomWireframes();
+                  wireframeEnabled = false; // deactivate solid wireframes if Random is selected
+                  setButtonHighlight("q");
+                } else if (control.key === "s") {
+                  godRaySpreadFactor += 2;
+                  if (godRaySpreadFactor > 20) godRaySpreadFactor = 6; // reset loop
+                  regenerateTemple();
+                  setButtonHighlight("s");
+                } else if (control.key === "t") {
+                  godRaySpreadFactor = 3;
+                  regenerateTemple();
+                  setButtonHighlight("t");
+                } else if (
+                  ["arrowLeft", "arrowRight", "arrowUp", "arrowDown"].includes(control.key)
+                ) {
+                  // Dispatch KeyboardEvent with correct capitalized Arrow key
+                  window.dispatchEvent(
+                    new KeyboardEvent("keydown", {
+                      key: control.key.replace("arrow", "Arrow"),
+                    })
+                  );
+                  setButtonHighlight(control.key);
+                // } else if (control.key === "u") {
+                //   choppySpeedEnabled = !choppySpeedEnabled;
+                //   setButtonHighlight("u");
                 } else {
-                  setButtonHighlight("o");
-                  wireframeEnabled = true;
+                  // Default: dispatch keydown event
+                  window.dispatchEvent(new KeyboardEvent("keydown", { key: control.key }));
+                  // Highlight for view keys and others as needed
+                  if (["1", "2", "3"].includes(control.key))
+                    activeViewKey = control.key;
+                  setButtonHighlight(control.key);
+                }
+              };
+
+              btn.addEventListener("mousedown", () => {
+                isPressing = true;
+                dispatchKey();
+                pressTimer = setInterval(dispatchKey, 100);
+              });
+
+              btn.addEventListener("mouseup", () => {
+                clearInterval(pressTimer);
+                isPressing = false;
+              });
+
+              btn.addEventListener("mouseleave", () => {
+                if (isPressing) {
+                  clearInterval(pressTimer);
+                  isPressing = false;
                 }
               });
-            } else if (control.key === "q") {
-              btn.addEventListener("click", () => {
-                toggleRandomWireframes();
-                wireframeEnabled = false; // deactivate solid wireframes if Random is selected
-                setButtonHighlight("q");
+
+              // Touch support
+              btn.addEventListener("touchstart", (e) => {
+                e.preventDefault();
+                isPressing = true;
+                dispatchKey();
+                pressTimer = setInterval(dispatchKey, 100);
+              }, { passive: false });
+
+              btn.addEventListener("touchend", () => {
+                clearInterval(pressTimer);
+                isPressing = false;
               });
-            } else if (control.key === "s") {
+            } else if (control.key === "n") {
               btn.addEventListener("click", () => {
-                godRaySpreadFactor += 2;
-                if (godRaySpreadFactor > 20) godRaySpreadFactor = 6; // loop reset
-                regenerateTemple();
-                setButtonHighlight("s");
-              });
-            } else if (control.key === "t") {
-              btn.addEventListener("click", () => {
-                tightenGodRays();
-                setButtonHighlight("t");
-              });
-            } else if (["+", "-", "0"].includes(control.key)) {
-              btn.addEventListener("click", () => {
-                window.dispatchEvent(
-                  new KeyboardEvent("keydown", { key: control.key })
-                );
-              });
-            } else {
-              btn.addEventListener("click", () => {
-                window.dispatchEvent(
-                  new KeyboardEvent("keydown", { key: control.key })
-                );
-                if (["1", "2", "3"].includes(control.key))
-                  activeViewKey = control.key;
-                setButtonHighlight(control.key);
+                invertPass.enabled = !invertPass.enabled;
+                btn.style.backgroundColor = invertPass.enabled
+                  ? "purple"
+                  : "rgba(255,255,255,0.1)";
               });
             }
             buttonContainer.appendChild(btn);
@@ -413,7 +484,13 @@ function toggleWireframes() {
                   btn.style.backgroundColor =
                     k === key ? "purple" : "rgba(255,255,255,0.1)";
                 }
-              } else if (fxKeys.includes(k) && k === key) {
+              // REMOVE fxKeys "n" highlight logic (handled by toggle button click)
+              //} else if (fxKeys.includes(k) && k === key) {
+              //  btn.style.backgroundColor = "purple";
+              //  setTimeout(() => {
+              //    btn.style.backgroundColor = "rgba(255,255,255,0.1)";
+              //  }, 500);
+              } else if (fxKeys.includes(k) && k === key && k !== "n") {
                 btn.style.backgroundColor = "purple";
                 setTimeout(() => {
                   btn.style.backgroundColor = "rgba(255,255,255,0.1)";
@@ -507,6 +584,7 @@ function toggleWireframes() {
           document.body.appendChild(showBtnContainer);
         }
         // Show HUD Button (in its own container)
+        // Only append the Show HUD button if not mobile (width > 1024)
         if (window.innerWidth > 1024 && !document.getElementById("showHUDButtonContainer")) {
           const showHUDContainer = document.createElement("div");
           showHUDContainer.id = "showHUDButtonContainer";
@@ -556,165 +634,183 @@ function toggleWireframes() {
             imgBtn.style.left = "10px";
             imgBtn.style.width = "60px";
             imgBtn.style.height = "60px";
-            imgBtn.style.opacity = "0.9";
-            imgBtn.style.pointerEvents = "none";
+            imgBtn.style.opacity = "1";
+            imgBtn.style.pointerEvents = "auto"; // ensure it's clickable
+            imgBtn.style.zIndex = "1003"; // match other buttons
           }
-          imgBtn.style.pointerEvents = "auto";
           let hoverHideTimeout;
           let hoverShowTimeout;
-          imgBtn.addEventListener("pointerenter", () => {
-            clearTimeout(hoverHideTimeout);
-            hoverHideTimeout = setTimeout(() => {
-              imgBtn.style.opacity = "0";
+          // Only add hover event listeners on desktop (not mobile)
+          if (window.innerWidth > 1024) {
+            imgBtn.addEventListener("pointerenter", () => {
+              clearTimeout(hoverHideTimeout);
+              hoverHideTimeout = setTimeout(() => {
+                imgBtn.style.opacity = "0";
+                const hudButtons = document.getElementById("hud-buttons");
+                const hideBtn = document.getElementById("hideButtonsBtn");
+                const showBtn = document.getElementById("showButtonsBtn");
+                const showHUD = document.getElementById("showHUDButton");
+                // Hide all click areas first
+                if (hideBtn) {
+                  hideBtn.style.display = "none";
+                  hideBtn.style.pointerEvents = "none";
+                }
+                if (showBtn) {
+                  showBtn.style.display = "none";
+                  showBtn.style.pointerEvents = "none";
+                }
+                if (showHUD) {
+                  showHUD.style.display = "none";
+                  showHUD.style.pointerEvents = "none";
+                }
+                // Show only the relevant button, and bring it to front, enable pointer events
+                if (hudButtons && hudButtons.style.display !== "none") {
+                  if (hideBtn) {
+                    hideBtn.style.display = "block";
+                    hideBtn.style.pointerEvents = "auto";
+                    hideBtn.style.zIndex = "1003";
+                  }
+                } else {
+                  if (showBtn) {
+                    showBtn.style.display = "block";
+                    showBtn.style.pointerEvents = "auto";
+                    showBtn.style.zIndex = "1003";
+                  }
+                }
+                const cm = document.getElementById("controlMap");
+                if (cm && cm.style.display === "none") {
+                  if (showHUD) {
+                    showHUD.style.display = "block";
+                    showHUD.style.pointerEvents = "auto";
+                    showHUD.style.zIndex = "1003";
+                  }
+                }
+                // Enable pointer events on container
+                const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
+                const showBtnContainer = document.getElementById("showButtonsBtnContainer");
+                const showHUDContainer = document.getElementById("showHUDButtonContainer");
+                if (hideBtn && hideBtn.style.display === "block" && hideBtnContainer) {
+                  hideBtnContainer.style.pointerEvents = "auto";
+                } else if (showBtn && showBtn.style.display === "block" && showBtnContainer) {
+                  showBtnContainer.style.pointerEvents = "auto";
+                } else if (showHUD && showHUD.style.display === "block" && showHUDContainer) {
+                  showHUDContainer.style.pointerEvents = "auto";
+                }
+                // Move logoToggleBtn below the other buttons
+                const logoToggleBtn = document.getElementById("logoToggleBtn");
+                if (logoToggleBtn) {
+                  logoToggleBtn.style.zIndex = "1001";
+                }
+              }, 1000);
+            });
+            imgBtn.addEventListener("pointerleave", () => {
+              clearTimeout(hoverShowTimeout);
+              hoverShowTimeout = setTimeout(() => {
+                // Check if mouse is still over any HUD-related buttons
+                const isMouseOverHUD = document.querySelectorAll(':hover');
+                const isOverOtherButtons = Array.from(isMouseOverHUD).some(el =>
+                  el.id === 'hideButtonsBtn' ||
+                  el.id === 'showButtonsBtn' ||
+                  el.id === 'showHUDButton'
+                );
+                // Insert a check to confirm the pointer is still not hovering over logoToggleBtn
+                const isStillHoveringLogo = Array.from(isMouseOverHUD).some(el => el.id === 'logoToggleBtn');
+                if (!isOverOtherButtons && !isStillHoveringLogo) {
+                  imgBtn.style.opacity = "1";
+                  // Bring logoToggleBtn back to top layer
+                  const logoToggleBtn = document.getElementById("logoToggleBtn");
+                  if (logoToggleBtn) {
+                    logoToggleBtn.style.zIndex = "1004";
+                  }
+                }
+                const hideBtn = document.getElementById("hideButtonsBtn");
+                const showBtn = document.getElementById("showButtonsBtn");
+                const showHUD = document.getElementById("showHUDButton");
+                // Hide all buttons and disable pointer events
+                if (hideBtn) {
+                  hideBtn.style.display = "none";
+                  hideBtn.style.pointerEvents = "none";
+                }
+                if (showBtn) {
+                  showBtn.style.display = "none";
+                  showBtn.style.pointerEvents = "none";
+                }
+                if (showHUD) {
+                  showHUD.style.display = "none";
+                  showHUD.style.pointerEvents = "none";
+                }
+                // Disable pointer events on containers
+                const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
+                const showBtnContainer = document.getElementById("showButtonsBtnContainer");
+                const showHUDContainer = document.getElementById("showHUDButtonContainer");
+                if (hideBtnContainer) hideBtnContainer.style.pointerEvents = "none";
+                if (showBtnContainer) showBtnContainer.style.pointerEvents = "none";
+                if (showHUDContainer) showHUDContainer.style.pointerEvents = "none";
+              }, 1500);
+            });
+          }
+          // MOBILE: Change logoToggleBtn onclick logic and hide HUD button for mobile
+          if (window.innerWidth <= 1024) {
+            imgBtn.onclick = () => {
+              const hudButtons = document.getElementById("hud-buttons");
+              const cm = document.getElementById("controlMap");
+              if (hudButtons && hudButtons.style.display !== "none") {
+                hudButtons.style.display = "none";
+                if (cm) cm.style.display = "none";
+              } else {
+                hudButtons.style.display = "block";
+                // HUD stays hidden on mobile
+              }
+            };
+          } else {
+            imgBtn.onclick = () => {
               const hudButtons = document.getElementById("hud-buttons");
               const hideBtn = document.getElementById("hideButtonsBtn");
               const showBtn = document.getElementById("showButtonsBtn");
+              const cm = document.getElementById("controlMap");
               const showHUD = document.getElementById("showHUDButton");
-              // Hide all click areas first
-              if (hideBtn) {
-                hideBtn.style.display = "none";
-                hideBtn.style.pointerEvents = "none";
-              }
-              if (showBtn) {
-                showBtn.style.display = "none";
-                showBtn.style.pointerEvents = "none";
-              }
-              if (showHUD) {
-                showHUD.style.display = "none";
-                showHUD.style.pointerEvents = "none";
-              }
-              // Show only the relevant button, and bring it to front, enable pointer events
               if (hudButtons && hudButtons.style.display !== "none") {
+                hudButtons.style.display = "none";
                 if (hideBtn) {
-                  hideBtn.style.display = "block";
-                  hideBtn.style.pointerEvents = "auto";
-                  hideBtn.style.zIndex = "1003";
+                  hideBtn.style.display = "none";
+                  hideBtn.style.pointerEvents = "none";
                 }
-              } else {
                 if (showBtn) {
                   showBtn.style.display = "block";
                   showBtn.style.pointerEvents = "auto";
                   showBtn.style.zIndex = "1003";
                 }
-              }
-              const cm = document.getElementById("controlMap");
-              if (cm && cm.style.display === "none") {
-                if (showHUD) {
-                  showHUD.style.display = "block";
-                  showHUD.style.pointerEvents = "auto";
-                  showHUD.style.zIndex = "1003";
+              } else {
+                hudButtons.style.display = "block";
+                if (hideBtn) {
+                  hideBtn.style.display = "block";
+                  hideBtn.style.pointerEvents = "auto";
+                  hideBtn.style.zIndex = "1003";
+                }
+                if (showBtn) {
+                  showBtn.style.display = "none";
+                  showBtn.style.pointerEvents = "none";
                 }
               }
-              // Enable pointer events on container
+              if (cm && cm.style.display === "none") {
+                cm.style.display = "block";
+                if (showHUD) {
+                  showHUD.style.display = "none";
+                  showHUD.style.pointerEvents = "none";
+                }
+              }
+              // Only one click area enabled at a time
               const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
               const showBtnContainer = document.getElementById("showButtonsBtnContainer");
-              const showHUDContainer = document.getElementById("showHUDButtonContainer");
               if (hideBtn && hideBtn.style.display === "block" && hideBtnContainer) {
                 hideBtnContainer.style.pointerEvents = "auto";
+                if (showBtnContainer) showBtnContainer.style.pointerEvents = "none";
               } else if (showBtn && showBtn.style.display === "block" && showBtnContainer) {
                 showBtnContainer.style.pointerEvents = "auto";
-              } else if (showHUD && showHUD.style.display === "block" && showHUDContainer) {
-                showHUDContainer.style.pointerEvents = "auto";
+                if (hideBtnContainer) hideBtnContainer.style.pointerEvents = "none";
               }
-              // Move logoToggleBtn below the other buttons
-              const logoToggleBtn = document.getElementById("logoToggleBtn");
-              if (logoToggleBtn) {
-                logoToggleBtn.style.zIndex = "1001";
-              }
-            }, 1000);
-          });
-          imgBtn.addEventListener("pointerleave", () => {
-            clearTimeout(hoverShowTimeout);
-            hoverShowTimeout = setTimeout(() => {
-              // Check if mouse is still over any HUD-related buttons
-              const isMouseOverHUD = document.querySelectorAll(':hover');
-              const isOverOtherButtons = Array.from(isMouseOverHUD).some(el =>
-                el.id === 'hideButtonsBtn' ||
-                el.id === 'showButtonsBtn' ||
-                el.id === 'showHUDButton'
-              );
-              // Insert a check to confirm the pointer is still not hovering over logoToggleBtn
-              const isStillHoveringLogo = Array.from(isMouseOverHUD).some(el => el.id === 'logoToggleBtn');
-              if (!isOverOtherButtons && !isStillHoveringLogo) {
-                imgBtn.style.opacity = "1";
-                // Bring logoToggleBtn back to top layer
-                const logoToggleBtn = document.getElementById("logoToggleBtn");
-                if (logoToggleBtn) {
-                  logoToggleBtn.style.zIndex = "1004";
-                }
-              }
-              const hideBtn = document.getElementById("hideButtonsBtn");
-              const showBtn = document.getElementById("showButtonsBtn");
-              const showHUD = document.getElementById("showHUDButton");
-              // Hide all buttons and disable pointer events
-              if (hideBtn) {
-                hideBtn.style.display = "none";
-                hideBtn.style.pointerEvents = "none";
-              }
-              if (showBtn) {
-                showBtn.style.display = "none";
-                showBtn.style.pointerEvents = "none";
-              }
-              if (showHUD) {
-                showHUD.style.display = "none";
-                showHUD.style.pointerEvents = "none";
-              }
-              // Disable pointer events on containers
-              const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
-              const showBtnContainer = document.getElementById("showButtonsBtnContainer");
-              const showHUDContainer = document.getElementById("showHUDButtonContainer");
-              if (hideBtnContainer) hideBtnContainer.style.pointerEvents = "none";
-              if (showBtnContainer) showBtnContainer.style.pointerEvents = "none";
-              if (showHUDContainer) showHUDContainer.style.pointerEvents = "none";
-            }, 1500);
-          });
-          imgBtn.onclick = () => {
-            const hudButtons = document.getElementById("hud-buttons");
-            const hideBtn = document.getElementById("hideButtonsBtn");
-            const showBtn = document.getElementById("showButtonsBtn");
-            const cm = document.getElementById("controlMap");
-            const showHUD = document.getElementById("showHUDButton");
-            if (hudButtons && hudButtons.style.display !== "none") {
-              hudButtons.style.display = "none";
-              if (hideBtn) {
-                hideBtn.style.display = "none";
-                hideBtn.style.pointerEvents = "none";
-              }
-              if (showBtn) {
-                showBtn.style.display = "block";
-                showBtn.style.pointerEvents = "auto";
-                showBtn.style.zIndex = "1003";
-              }
-            } else {
-              hudButtons.style.display = "block";
-              if (hideBtn) {
-                hideBtn.style.display = "block";
-                hideBtn.style.pointerEvents = "auto";
-                hideBtn.style.zIndex = "1003";
-              }
-              if (showBtn) {
-                showBtn.style.display = "none";
-                showBtn.style.pointerEvents = "none";
-              }
-            }
-            if (cm && cm.style.display === "none") {
-              cm.style.display = "block";
-              if (showHUD) {
-                showHUD.style.display = "none";
-                showHUD.style.pointerEvents = "none";
-              }
-            }
-            // Only one click area enabled at a time
-            const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
-            const showBtnContainer = document.getElementById("showButtonsBtnContainer");
-            if (hideBtn && hideBtn.style.display === "block" && hideBtnContainer) {
-              hideBtnContainer.style.pointerEvents = "auto";
-              if (showBtnContainer) showBtnContainer.style.pointerEvents = "none";
-            } else if (showBtn && showBtn.style.display === "block" && showBtnContainer) {
-              showBtnContainer.style.pointerEvents = "auto";
-              if (hideBtnContainer) hideBtnContainer.style.pointerEvents = "none";
-            }
-          };
+            };
+          }
           document.body.appendChild(imgBtn);
           // Show the button with fade-in after a short delay for effect
           setTimeout(() => {
@@ -938,6 +1034,14 @@ function toggleWireframes() {
       renderer.setSize(window.innerWidth, window.innerHeight);
       renderer.setPixelRatio(window.devicePixelRatio);
       document.body.appendChild(renderer.domElement);
+      // Ensure the canvas fully covers the screen
+      renderer.domElement.style.position = "absolute";
+      renderer.domElement.style.top = "0px";
+      renderer.domElement.style.left = "0px";
+      renderer.domElement.style.bottom = "0px";
+      renderer.domElement.style.right = "0px";
+      renderer.domElement.style.width = "100%";
+      renderer.domElement.style.height = "100%";
 
       const composer = new THREE.EffectComposer(renderer);
       const renderPass = new THREE.RenderPass(scene, camera);
@@ -1039,7 +1143,6 @@ function toggleWireframes() {
 
       // Keyboard event: change color palette with key presses and toggle control map
 window.addEventListener("keydown", (e) => {
-  console.log("Key pressed:", e.key);
   switch (e.key) {
     case "ArrowLeft":
       targetYawAngle = Math.max(-Math.PI, targetYawAngle - 0.05);
@@ -1090,9 +1193,9 @@ window.addEventListener("keydown", (e) => {
     case "h":
       updatePalette(0.33);
       break;
-    case "u":
-      choppySpeedEnabled = !choppySpeedEnabled;
-      break;
+    // case "u":
+    //   choppySpeedEnabled = !choppySpeedEnabled;
+    //   break;
     case "b": // Blue tones
       updatePalette(0.66);
       break;
@@ -1174,17 +1277,6 @@ window.addEventListener("keydown", (e) => {
     case "h":
       const cm = document.getElementById("controlMap");
       cm.style.display = cm.style.display === "none" ? "block" : "none";
-      break;
-    // --- Add s and t key support for god ray spread/tighten ---
-    case "s":
-      godRaySpreadFactor += 2;
-      if (godRaySpreadFactor > 20) godRaySpreadFactor = 6;
-      regenerateTemple();
-      if (typeof setButtonHighlight === "function") setButtonHighlight("s");
-      break;
-    case "t":
-      tightenGodRays();
-      if (typeof setButtonHighlight === "function") setButtonHighlight("t");
       break;
   }
 });
@@ -2560,18 +2652,8 @@ i
     case "t":
       tightenGodRays();
       break;
-    case "s":
-      console.log("Pressed S - Spread Rays");
-      godRaySpreadFactor += 2;
-      if (godRaySpreadFactor > 20) godRaySpreadFactor = 6;
-      regenerateTemple();
-      if (typeof setButtonHighlight === "function")
-        setButtonHighlight("s");
-      break;
-
-    case "t":
-      console.log("Pressed T - Tighten Rays");
-      tightenGodRays();
-      if (typeof setButtonHighlight === "function")
-        setButtonHighlight("t");
-      break;
+// Ensure dynamic resizing of renderer and composer
+window.addEventListener("resize", () => {
+  renderer.setSize(window.innerWidth, window.innerHeight);
+  composer.setSize(window.innerWidth, window.innerHeight);
+});ti
