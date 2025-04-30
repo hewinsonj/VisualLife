@@ -1,4 +1,4 @@
-(All Three.js logic is now inside the script block below)
+<!-- (All Three.js logic is now inside the script block below) -->
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -20,9 +20,10 @@
         display: block;
       }
       button {
-        -webkit-user-select: none; /* Safari */
-        -ms-user-select: none; /* IE 10 and IE 11 */
-        user-select: none; /* Standard syntax */
+        -webkit-user-select: text;
+        -moz-user-select: text;
+        -ms-user-select: text;
+        user-select: text;
         touch-action: manipulation;
       }
       body.mobile #hud-buttons button {
@@ -35,66 +36,6 @@
         padding: 6px 10px !important;
         font-size: 12px !important;
         border-radius: 4px !important;
-      }
-      .hidden {
-        display: none;
-      }
-
-      #seizureWarning {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        background: rgba(0, 0, 0, 0.96);
-        color: white;
-        font-family: monospace;
-        display: flex;
-        flex-direction: column;
-        justify-content: center;
-        align-items: center;
-        text-align: center;
-        z-index: 5000;
-        transition: opacity 1.5s ease;
-        backdrop-filter: blur(2px);
-      }
-
-      #seizureWarning.fadeOut {
-        opacity: 0;
-        pointer-events: none;
-      }
-
-      #enterButton {
-        margin-top: 40px;
-        padding: 10px 20px;
-        font-size: 16px;
-        background: rgba(255, 255, 255, 0.1);
-        border: 1px solid white;
-        color: white;
-        border-radius: 5px;
-        cursor: pointer;
-        animation: pulse 2s infinite ease-in-out;
-      }
-
-      @keyframes pulse {
-        0%, 100% {
-          transform: scale(1);
-        }
-        50% {
-          transform: scale(1.08);
-        }
-      }
-      #seizureWarning > div {
-        /* This rule is no longer needed; replaced by .warningContent */
-      }
-      .warningContent {
-        display: flex;
-        flex-direction: column;
-        align-items: center;
-        justify-content: center;
-        text-align: center;
-        max-width: 600px;
-        width: 90%;
       }
     </style>
   </head>
@@ -121,121 +62,34 @@
     ⚡ Glitch Mode On
   </div>
   <body>
-    <div id="seizureWarning">
-      <div class="warningContent">
-        <img 
-          src="./assets/image3.png" 
-          alt="VisualLife Logo" 
-          style="
-            width: 240px;
-            opacity: 1;
-            border-radius: 20px;
-            margin-bottom: 20px;
-            filter: drop-shadow(0 0 20px rgba(255, 255, 255, 0.2));
-            transition: opacity 1s ease-in-out;
-          "
-        />
-        <h1 style="font-size: 2em; color: #ff00ff;">⚡ Seizure Warning ⚡</h1>
-        <p style="margin-top: 20px;">
-          This visualizer contains intense flashing lights and patterns.<br/>
-          Viewer discretion is advised.
-        </p>
-        <button id="enterButton">Enter</button>
-      </div>
-    </div>
+    <div
+      id="hud"
+      style="
+        position: fixed;
+        top: 0;
+        left: 0;
+        padding: 10px;
+        color: #fff;
+        font-family: monospace;
+        font-size: 12px;
+        z-index: 1000;
+      "
+    ></div>
+    <!-- Mobile Touch Controls (conditionally rendered via JS below) -->
 
-    <div id="visualizerApp">
-      <div
-        id="hud"
-        style="
-          position: fixed;
-          top: 0;
-          left: 0;
-          padding: 10px;
-          color: #fff;
-          font-family: monospace;
-          font-size: 12px;
-          z-index: 1000;
-        "
-      ></div>
-      <!-- Mobile Touch Controls (conditionally rendered via JS below) -->
-
-      <!-- Insert HUD buttons dynamically based on screen size and device -->
+    <!-- Insert HUD buttons dynamically based on screen size and device -->
     <script>
 
 let zoomVelocity = 0;
 let targetZoom = 30; // default zoom
-let allowAutoWireframeAnimation = true;
-
-let godRaySpreadFactor = 10; // Default spread
-
-// Tighten God Rays: set spread to tight and regenerate temple
-function tightenGodRays() {
-  godRaySpreadFactor = 3; // Close them in tightly
-  regenerateTemple();
-  setButtonHighlight("t"); // Optional: highlight the button
-}
-
-// --- Toggle random wireframe mode for all meshes/lines/points in the scene ---
-let randomWireframeEnabled = false;
-function toggleRandomWireframes() {
-  // console.log("[RandomOutline] Toggled Random Wireframe:", !randomWireframeEnabled);
-  randomWireframeEnabled = !randomWireframeEnabled;
-  // allowAutoWireframeAnimation = !randomWireframeEnabled;
-  // console.log("[RandomOutline] allowAutoWireframeAnimation:", allowAutoWireframeAnimation);
-
-  scene.traverse((object) => {
-    if ((object.isMesh || object.isPoints || object.isLine) && object.material) {
-      if (Array.isArray(object.material)) {
-        object.material.forEach((mat) => {
-          if ('wireframe' in mat) {
-            if (randomWireframeEnabled) {
-              mat.wireframe = Math.random() > 0.5;
-            } else {
-              mat.wireframe = false;
-            }
-          }
-        });
-      } else if ('wireframe' in object.material) {
-        if (randomWireframeEnabled) {
-          object.material.wireframe = Math.random() > 0.5;
-        } else {
-          object.material.wireframe = false;
-        }
-      }
-    }
-  });
-
-  sacredGroup.children.forEach((mesh) => {
-    if (mesh.material) {
-      if (Array.isArray(mesh.material)) {
-        mesh.material.forEach((mat) => {
-          if ('wireframe' in mat) {
-            if (randomWireframeEnabled) {
-              mat.wireframe = Math.random() > 0.5;
-            } else {
-              mat.wireframe = false;
-            }
-          }
-        });
-      } else if ('wireframe' in mesh.material) {
-        if (randomWireframeEnabled) {
-          mesh.material.wireframe = Math.random() > 0.5;
-        } else {
-          mesh.material.wireframe = false;
-        }
-      }
-    }
-  });
-}
       function detectMobileMode() {
         const isSmallScreen = window.innerWidth <= 1024;
-        // console.log(
-        //   "Applying mobile mode:",
-        //   isSmallScreen,
-        //   "| Width:",
-        //   window.innerWidth
-        // );
+        console.log(
+          "Applying mobile mode:",
+          isSmallScreen,
+          "| Width:",
+          window.innerWidth
+        );
         document.body.classList.toggle("mobile", isSmallScreen);
         if (typeof renderHUDButtons === "function") renderHUDButtons();
       }
@@ -254,9 +108,6 @@ function toggleRandomWireframes() {
             { key: "1", label: "View 1" },
             { key: "2", label: "View 2" },
             { key: "3", label: "View 3" },
-            { key: "+", label: "Time +" },
-            { key: "-", label: "Time -" },
-            { key: "0", label: "Time 1x" },
             { key: "g", label: "Glitch" },
             { key: "x", label: "Cycle" },
             { key: "r", label: "Red" },
@@ -274,15 +125,10 @@ function toggleRandomWireframes() {
             { key: "n", label: "Invert" },
             { key: "c", label: "Contrast" },
             { key: "d", label: "Birghtness" },
-            { key: "o", label: "Outline" },
-            { key: "q", label: "Randomize Outlines" },
-            { key: "u", label: "Choppy Speed" },
-            { key: "arrowLeft", label: "←" },
-            { key: "arrowRight", label: "→" },
-            { key: "arrowUp", label: "↑" },
-            { key: "arrowDown", label: "↓" },
-            { key: "s", label: "Spread Rays" },
-            { key: "t", label: "Tighten Rays" }
+            { key: "ArrowLeft", label: "←" },
+            { key: "ArrowRight", label: "→" },
+            { key: "ArrowUp", label: "↑" },
+            { key: "ArrowDown", label: "↓" },
           ];
           const buttonMap = {};
           controls.forEach((control) => {
@@ -321,43 +167,6 @@ function toggleRandomWireframes() {
                   : "rgba(255,255,255,0.1)";
                 setButtonHighlight(control.key);
               });
-            } else if (control.key === "o") {
-              btn.addEventListener("click", () => {
-                toggleWireframes();
-                randomWireframeEnabled = false; // deactivate random wireframes if Outline is selected
-
-                if (btn.style.backgroundColor === "purple") {
-                  btn.style.backgroundColor = "rgba(255,255,255,0.1)";
-                  wireframeEnabled = false;
-                } else {
-                  setButtonHighlight("o");
-                  wireframeEnabled = true;
-                }
-              });
-            } else if (control.key === "q") {
-              btn.addEventListener("click", () => {
-                toggleRandomWireframes();
-                wireframeEnabled = false; // deactivate solid wireframes if Random is selected
-                setButtonHighlight("q");
-              });
-            } else if (control.key === "s") {
-              btn.addEventListener("click", () => {
-                godRaySpreadFactor += 2;
-                if (godRaySpreadFactor > 20) godRaySpreadFactor = 6; // loop reset
-                regenerateTemple();
-                setButtonHighlight("s");
-              });
-            } else if (control.key === "t") {
-              btn.addEventListener("click", () => {
-                tightenGodRays();
-                setButtonHighlight("t");
-              });
-            } else if (["+", "-", "0"].includes(control.key)) {
-              btn.addEventListener("click", () => {
-                window.dispatchEvent(
-                  new KeyboardEvent("keydown", { key: control.key })
-                );
-              });
             } else {
               btn.addEventListener("click", () => {
                 window.dispatchEvent(
@@ -370,23 +179,6 @@ function toggleRandomWireframes() {
             }
             buttonContainer.appendChild(btn);
           });
-// --- Toggle wireframe mode for all meshes in the scene ---
-let wireframeEnabled = false;
-function toggleWireframes() {
-  wireframeEnabled = !wireframeEnabled;
-  scene.traverse((object) => {
-    if (object.isMesh && object.material) {
-      if (Array.isArray(object.material)) {
-        object.material.forEach((mat) => {
-          mat.wireframe = wireframeEnabled;
-        });
-      } else {
-        object.material.wireframe = wireframeEnabled;
-      }
-    }
-  });
-}
-
 
           let activeViewKey = "1";
           function setButtonHighlight(key) {
@@ -395,8 +187,7 @@ function toggleWireframes() {
             const colorKeys = ["r", "h", "b", "p", "y", "w", "x"];
             const fxKeys = ["d", "c", "n"];
             const stickyKeys = ["f", "v"];
-            const flashKeys = ["e", "k", "l", "z", "s", "t"];
-            const outlineKeys = ["o", "q"];
+            const flashKeys = ["e", "k", "l", "z"];
 
             Object.entries(buttonMap).forEach(([k, btn]) => {
               if (viewKeys.includes(k)) {
@@ -431,11 +222,6 @@ function toggleWireframes() {
                 setTimeout(() => {
                   btn.style.backgroundColor = "rgba(255,255,255,0.1)";
                 }, 500);
-              } else if (outlineKeys.includes(k)) {
-                if (outlineKeys.includes(key)) {
-                  btn.style.backgroundColor =
-                    k === key ? "purple" : "rgba(255,255,255,0.1)";
-                }
               }
             });
           }
@@ -443,291 +229,60 @@ function toggleWireframes() {
           hud.appendChild(buttonContainer);
         }
         // --- Add hide/show Buttons logic for desktop only (after #hud-buttons inserted) ---
-        // Wrap hideBtn, showBtn, and showHUD in separate containers to avoid overlapping click areas
-        // Only append the hide button if not mobile (width > 1024)
-        if (!document.getElementById("hideButtonsBtnContainer") && window.innerWidth > 1024) {
-          const hideBtnContainer = document.createElement("div");
-          hideBtnContainer.id = "hideButtonsBtnContainer";
-          hideBtnContainer.style.position = "fixed";
-          hideBtnContainer.style.top = "100px";
-          hideBtnContainer.style.left = "10px";
-          hideBtnContainer.style.zIndex = "1003";
-          hideBtnContainer.style.pointerEvents = "none";
+        // Replace hideButtonsBtn logic: only append if not mobile (width > 1024)
+        if (!document.getElementById("hideButtonsBtn")) {
           const hideBtn = document.createElement("button");
           hideBtn.id = "hideButtonsBtn";
           hideBtn.textContent = "Hide Buttons";
           hideBtn.style.cssText =
-            "padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
+            "position:fixed;top:100px;left:10px;z-index:1001;padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
           hideBtn.onclick = () => {
             document.getElementById("hud-buttons").style.display = "none";
             hideBtn.style.display = "none";
-            hideBtn.style.pointerEvents = "none";
             const showBtn = document.getElementById("showButtonsBtn");
-            if (showBtn) {
-              showBtn.style.display = "block";
-              showBtn.style.pointerEvents = "auto";
-              showBtn.style.zIndex = "1003";
-            }
+            if (showBtn) showBtn.style.display = "block";
           };
-          hideBtn.style.display = "none";
-          hideBtn.style.pointerEvents = "none";
-          hideBtnContainer.appendChild(hideBtn);
-          document.body.appendChild(hideBtnContainer);
+          // Only append the hide button if not mobile (width > 1024)
+          if (window.innerWidth > 1024) {
+            document.body.appendChild(hideBtn);
+          }
         }
-        // Show Buttons Button (in its own container)
-        if (!document.getElementById("showButtonsBtnContainer") && !document.body.classList.contains("mobile")) {
-          const showBtnContainer = document.createElement("div");
-          showBtnContainer.id = "showButtonsBtnContainer";
-          showBtnContainer.style.position = "fixed";
-          showBtnContainer.style.top = "100px";
-          showBtnContainer.style.left = "10px";
-          showBtnContainer.style.zIndex = "1003";
-          showBtnContainer.style.pointerEvents = "none";
+        if (
+          !document.getElementById("showButtonsBtn") &&
+          !document.body.classList.contains("mobile")
+        ) {
           const showBtn = document.createElement("button");
           showBtn.id = "showButtonsBtn";
           showBtn.textContent = "Show Buttons";
           showBtn.style.cssText =
-            "padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
+            "position:fixed;top:100px;left:10px;z-index:1001;padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
           showBtn.style.display = "none";
-          showBtn.style.pointerEvents = "none";
           showBtn.onclick = () => {
             document.getElementById("hud-buttons").style.display = "block";
             showBtn.style.display = "none";
-            showBtn.style.pointerEvents = "none";
             const hideBtn = document.getElementById("hideButtonsBtn");
-            if (hideBtn) {
-              hideBtn.style.display = "block";
-              hideBtn.style.pointerEvents = "auto";
-              hideBtn.style.zIndex = "1003";
-            }
+            if (hideBtn) hideBtn.style.display = "block";
           };
-          showBtnContainer.appendChild(showBtn);
-          document.body.appendChild(showBtnContainer);
+          document.body.appendChild(showBtn);
         }
-        // Show HUD Button (in its own container)
-        if (window.innerWidth > 1024 && !document.getElementById("showHUDButtonContainer")) {
-          const showHUDContainer = document.createElement("div");
-          showHUDContainer.id = "showHUDButtonContainer";
-          showHUDContainer.style.position = "fixed";
-          showHUDContainer.style.top = "140px";
-          showHUDContainer.style.left = "10px";
-          showHUDContainer.style.zIndex = "1003";
-          showHUDContainer.style.pointerEvents = "none";
-          const showHUDBtn = document.createElement("button");
-          showHUDBtn.id = "showHUDButton";
-          showHUDBtn.textContent = "Show HUD";
-          showHUDBtn.style.cssText =
-            "padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
-          showHUDBtn.onclick = () => {
+        if (controlMap) controlMap.style.display = "block";
+        // --- Add show HUD button on desktop only ---
+        if (
+          !document.getElementById("showHUDButton") &&
+          !document.body.classList.contains("mobile")
+        ) {
+          const showBtn = document.createElement("button");
+          showBtn.id = "showHUDButton";
+          showBtn.textContent = "Show HUD";
+          showBtn.style.cssText =
+            "position:fixed;top:140px;left:10px;z-index:1001;padding:4px 8px;font-size:10px;background:rgba(255,255,255,0.2);color:white;border:1px solid white;border-radius:4px;cursor:pointer;";
+          showBtn.onclick = () => {
             document.getElementById("controlMap").style.display = "block";
-            showHUDBtn.style.display = "none";
-            showHUDBtn.style.pointerEvents = "none";
+            showBtn.style.display = "none";
           };
-          showHUDBtn.style.display = "none";
-          showHUDBtn.style.pointerEvents = "none";
-          showHUDContainer.appendChild(showHUDBtn);
-          document.body.appendChild(showHUDContainer);
-          if (document.getElementById("controlMap"))
-            document.getElementById("controlMap").style.display = "block";
-        }
-        // Add image button for toggling hideButtonsBtn on hover and show HUD on click
-        if (!document.getElementById("logoToggleBtn")) {
-          const imgBtn = document.createElement("img");
-          imgBtn.id = "logoToggleBtn";
-          imgBtn.src = "./assets/logo.png";
-          imgBtn.style.cssText = `
-            position:fixed;
-            top:100px;
-            left:10px;
-            width:80px;
-            height:80px;
-            z-index:1002;
-            opacity: 0;
-            border-radius: 12px;
-            cursor:pointer;
-            transition: opacity 0.8s ease, transform 0.2s ease;
-          `;
-          // --- Responsive adjustments for mobile ---
-          if (window.innerWidth <= 1024) {
-            imgBtn.style.top = "unset";
-            imgBtn.style.bottom = "10px";
-            imgBtn.style.left = "10px";
-            imgBtn.style.width = "60px";
-            imgBtn.style.height = "60px";
-            imgBtn.style.opacity = "0.9";
-            imgBtn.style.pointerEvents = "none";
-          }
-          imgBtn.style.pointerEvents = "auto";
-          let hoverHideTimeout;
-          let hoverShowTimeout;
-          imgBtn.addEventListener("pointerenter", () => {
-            clearTimeout(hoverHideTimeout);
-            hoverHideTimeout = setTimeout(() => {
-              imgBtn.style.opacity = "0";
-              const hudButtons = document.getElementById("hud-buttons");
-              const hideBtn = document.getElementById("hideButtonsBtn");
-              const showBtn = document.getElementById("showButtonsBtn");
-              const showHUD = document.getElementById("showHUDButton");
-              // Hide all click areas first
-              if (hideBtn) {
-                hideBtn.style.display = "none";
-                hideBtn.style.pointerEvents = "none";
-              }
-              if (showBtn) {
-                showBtn.style.display = "none";
-                showBtn.style.pointerEvents = "none";
-              }
-              if (showHUD) {
-                showHUD.style.display = "none";
-                showHUD.style.pointerEvents = "none";
-              }
-              // Show only the relevant button, and bring it to front, enable pointer events
-              if (hudButtons && hudButtons.style.display !== "none") {
-                if (hideBtn) {
-                  hideBtn.style.display = "block";
-                  hideBtn.style.pointerEvents = "auto";
-                  hideBtn.style.zIndex = "1003";
-                }
-              } else {
-                if (showBtn) {
-                  showBtn.style.display = "block";
-                  showBtn.style.pointerEvents = "auto";
-                  showBtn.style.zIndex = "1003";
-                }
-              }
-              const cm = document.getElementById("controlMap");
-              if (cm && cm.style.display === "none") {
-                if (showHUD) {
-                  showHUD.style.display = "block";
-                  showHUD.style.pointerEvents = "auto";
-                  showHUD.style.zIndex = "1003";
-                }
-              }
-              // Enable pointer events on container
-              const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
-              const showBtnContainer = document.getElementById("showButtonsBtnContainer");
-              const showHUDContainer = document.getElementById("showHUDButtonContainer");
-              if (hideBtn && hideBtn.style.display === "block" && hideBtnContainer) {
-                hideBtnContainer.style.pointerEvents = "auto";
-              } else if (showBtn && showBtn.style.display === "block" && showBtnContainer) {
-                showBtnContainer.style.pointerEvents = "auto";
-              } else if (showHUD && showHUD.style.display === "block" && showHUDContainer) {
-                showHUDContainer.style.pointerEvents = "auto";
-              }
-              // Move logoToggleBtn below the other buttons
-              const logoToggleBtn = document.getElementById("logoToggleBtn");
-              if (logoToggleBtn) {
-                logoToggleBtn.style.zIndex = "1001";
-              }
-            }, 1000);
-          });
-          imgBtn.addEventListener("pointerleave", () => {
-            clearTimeout(hoverShowTimeout);
-            hoverShowTimeout = setTimeout(() => {
-              // Check if mouse is still over any HUD-related buttons
-              const isMouseOverHUD = document.querySelectorAll(':hover');
-              const isOverOtherButtons = Array.from(isMouseOverHUD).some(el =>
-                el.id === 'hideButtonsBtn' ||
-                el.id === 'showButtonsBtn' ||
-                el.id === 'showHUDButton'
-              );
-              // Insert a check to confirm the pointer is still not hovering over logoToggleBtn
-              const isStillHoveringLogo = Array.from(isMouseOverHUD).some(el => el.id === 'logoToggleBtn');
-              if (!isOverOtherButtons && !isStillHoveringLogo) {
-                imgBtn.style.opacity = "1";
-                // Bring logoToggleBtn back to top layer
-                const logoToggleBtn = document.getElementById("logoToggleBtn");
-                if (logoToggleBtn) {
-                  logoToggleBtn.style.zIndex = "1004";
-                }
-              }
-              const hideBtn = document.getElementById("hideButtonsBtn");
-              const showBtn = document.getElementById("showButtonsBtn");
-              const showHUD = document.getElementById("showHUDButton");
-              // Hide all buttons and disable pointer events
-              if (hideBtn) {
-                hideBtn.style.display = "none";
-                hideBtn.style.pointerEvents = "none";
-              }
-              if (showBtn) {
-                showBtn.style.display = "none";
-                showBtn.style.pointerEvents = "none";
-              }
-              if (showHUD) {
-                showHUD.style.display = "none";
-                showHUD.style.pointerEvents = "none";
-              }
-              // Disable pointer events on containers
-              const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
-              const showBtnContainer = document.getElementById("showButtonsBtnContainer");
-              const showHUDContainer = document.getElementById("showHUDButtonContainer");
-              if (hideBtnContainer) hideBtnContainer.style.pointerEvents = "none";
-              if (showBtnContainer) showBtnContainer.style.pointerEvents = "none";
-              if (showHUDContainer) showHUDContainer.style.pointerEvents = "none";
-            }, 1500);
-          });
-          imgBtn.onclick = () => {
-            const hudButtons = document.getElementById("hud-buttons");
-            const hideBtn = document.getElementById("hideButtonsBtn");
-            const showBtn = document.getElementById("showButtonsBtn");
-            const cm = document.getElementById("controlMap");
-            const showHUD = document.getElementById("showHUDButton");
-            if (hudButtons && hudButtons.style.display !== "none") {
-              hudButtons.style.display = "none";
-              if (hideBtn) {
-                hideBtn.style.display = "none";
-                hideBtn.style.pointerEvents = "none";
-              }
-              if (showBtn) {
-                showBtn.style.display = "block";
-                showBtn.style.pointerEvents = "auto";
-                showBtn.style.zIndex = "1003";
-              }
-            } else {
-              hudButtons.style.display = "block";
-              if (hideBtn) {
-                hideBtn.style.display = "block";
-                hideBtn.style.pointerEvents = "auto";
-                hideBtn.style.zIndex = "1003";
-              }
-              if (showBtn) {
-                showBtn.style.display = "none";
-                showBtn.style.pointerEvents = "none";
-              }
-            }
-            if (cm && cm.style.display === "none") {
-              cm.style.display = "block";
-              if (showHUD) {
-                showHUD.style.display = "none";
-                showHUD.style.pointerEvents = "none";
-              }
-            }
-            // Only one click area enabled at a time
-            const hideBtnContainer = document.getElementById("hideButtonsBtnContainer");
-            const showBtnContainer = document.getElementById("showButtonsBtnContainer");
-            if (hideBtn && hideBtn.style.display === "block" && hideBtnContainer) {
-              hideBtnContainer.style.pointerEvents = "auto";
-              if (showBtnContainer) showBtnContainer.style.pointerEvents = "none";
-            } else if (showBtn && showBtn.style.display === "block" && showBtnContainer) {
-              showBtnContainer.style.pointerEvents = "auto";
-              if (hideBtnContainer) hideBtnContainer.style.pointerEvents = "none";
-            }
-          };
-          document.body.appendChild(imgBtn);
-          // Show the button with fade-in after a short delay for effect
-          setTimeout(() => {
-            // Ensure initial opacity is visible by default on mobile
-            if (window.innerWidth <= 1024) {
-              imgBtn.style.opacity = "1";
-            } else {
-              imgBtn.style.opacity = "1";
-              imgBtn.dispatchEvent(new Event("pointerenter")); // Simulate hover on load
-              // Simulate un-hover after 1 second to mimic brief initial interaction
-              setTimeout(() => {
-                imgBtn.dispatchEvent(new Event("pointerleave"));
-              }, 1000);
-            }
-          }, 100);
+          showBtn.style.display = "none"; // default hidden
+          document.getElementById("controlMap").style.display = "block"; // ensure HUD is visible on load
+          document.body.appendChild(showBtn);
         }
       }
 
@@ -737,30 +292,25 @@ function toggleWireframes() {
     <script>
       // Insert the controlMap panel dynamically after HUD buttons
       (function () {
-      function insertControlMap() {
-        let controlMap = document.getElementById("controlMap");
-        if (!controlMap) {
-          controlMap = document.createElement("div");
-          controlMap.id = "controlMap";
-          controlMap.style.position = "fixed";
-          controlMap.style.top = "40px";
-          controlMap.style.left = "10px";
-          controlMap.style.padding = "10px";
-          controlMap.style.background = "rgba(0, 0, 0, 0.5)";
-          controlMap.style.color = "#fff";
-          controlMap.style.fontFamily = "monospace";
-          controlMap.style.fontSize = "11px";
-          controlMap.style.zIndex = "500";
-          controlMap.style.marginTop = "150px"; // move further below the buttons
-          controlMap.style.borderRadius = "5px";
-          let html = `
+        function insertControlMap() {
+          let controlMap = document.getElementById("controlMap");
+          if (!controlMap) {
+            controlMap = document.createElement("div");
+            controlMap.id = "controlMap";
+            controlMap.style.position = "fixed";
+            controlMap.style.top = "40px";
+            controlMap.style.left = "10px";
+            controlMap.style.padding = "10px";
+            controlMap.style.background = "rgba(0, 0, 0, 0.5)";
+            controlMap.style.color = "#fff";
+            controlMap.style.fontFamily = "monospace";
+            controlMap.style.fontSize = "11px";
+            controlMap.style.zIndex = "500";
+            controlMap.style.marginTop = "100px"; // move further below the buttons
+            controlMap.style.borderRadius = "5px";
+            let html = `
     <strong><div style="text-align: right; margin-bottom: 5px;">
-      <button onclick="document.getElementById('controlMap').style.display='none';
-      const hoveredEls = document.querySelectorAll(':hover');
-      const isHoveringLogo = Array.from(hoveredEls).some(el => el.id === 'logoToggleBtn');
-      if (!isHoveringLogo) {
-        document.getElementById('showHUDButton').style.display = 'block';
-      }" style="background: transparent; color: white; border: none; font-size: 14px; cursor: pointer;">✖</button>
+      <button onclick="document.getElementById('controlMap').style.display='none'; document.getElementById('showHUDButton').style.display='block';" style="background: transparent; color: white; border: none; font-size: 14px; cursor: pointer;">✖</button>
     </div>🖱 Mouse or Touch:</strong><br />
     • Left Drag: Orbit<br />
     • Scroll: Zoom<br />
@@ -770,31 +320,18 @@ function toggleWireframes() {
     html += `
     <strong>⌨️ Keyboard:</strong><br />
     • [1/2/3]: View Modes<br />
-    • [Arrow Keys]: Tilt & Rotate<br />
-    • [+/-/0]: Speed Up / Slow Down / Reset Speed<br />
-    • [-]: Zoom In<br />
-    • []]: Zoom Out<br />
-    • [F]: Toggle Fisheye Effect<br />
-    • [V]: Toggle Wormhole Effect<br />
-    • [E]: Scramble Shapes<br />
-    • [K]: Push Shapes<br />
-    • [L]: Pull Shapes<br />
+    • [R/H/B/P/Y/W/X]: Color Palettes<br />
+    • [C/D/N]: Contrast / Brightness / Invert<br />
+    • [F/V]: Fisheye / Wormhole<br />
+    • [E]: Scramble<br />
+    • [K/L]: Push / Pull<br />
     • [Z]: Regenerate Temple<br />
-    • [C]: Adjust Contrast<br />
-    • [D]: Adjust Brightness<br />
-    • [N]: Invert Colors<br />
-    • [R/H/B/P/Y/W]: Color Palettes<br />
-    • [X]: Cycle Random Palette<br />
+    • [Arrow Keys]: Tilt & Rotate<br />
     • [G]: Hold to Glitch<br />
-    • [Q]: Randomize Outlines<br />
-    • [O]: Toggle Wireframe Outlines<br />
-    • [S]: Spread God Rays<br />
-    • [T]: Tighten God Rays<br />
-    • [U]: Toggle Choppy Speed<br />
     `;
   }
   controlMap.innerHTML = html;
-        }
+          }
           // Insert after HUD buttons
           const hud = document.getElementById("hud");
           const buttonContainer = document.getElementById("hud-buttons");
@@ -833,21 +370,6 @@ function toggleWireframes() {
     <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/shaders/RGBShiftShader.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/three@0.140.0/examples/js/postprocessing/RGBShiftPass.js"></script>
     <script>
-      // Seizure warning fade-out logic
-      document.addEventListener("DOMContentLoaded", function() {
-        var enterBtn = document.getElementById("enterButton");
-        if (enterBtn) {
-          enterBtn.addEventListener("click", function() {
-            const warning = document.getElementById("seizureWarning");
-            warning.classList.add("fadeOut");
-            setTimeout(() => {
-              warning.classList.add("hidden");
-            }, 800);
-          });
-        }
-      });
-    </script>
-    <script>
       // --- Negative Color (Invert) Shader Pass ---
       const invertShader = {
         uniforms: { tDiffuse: { value: null } },
@@ -863,15 +385,17 @@ function toggleWireframes() {
         varying vec2 vUv;
         void main() {
           vec4 color = texture2D(tDiffuse, vUv);
-          vec3 negative = vec3(1.0) - color.rgb;
-          float brightness = dot(negative, vec3(0.299, 0.587, 0.114));
-          negative = mix(negative, vec3(brightness), 0.2); // desaturate slightly
-          gl_FragColor = vec4(negative, color.a);
+          vec3 inverted = 1.0 - color.rgb;
+          gl_FragColor = vec4(inverted, color.a);
         }
       `,
       };
       const invertPass = new THREE.ShaderPass(invertShader);
       invertPass.enabled = false;
+      // Add to composer after other passes
+      if (typeof composer !== "undefined" && composer.addPass) {
+        composer.addPass(invertPass);
+      }
     </script>
     <script>
       // --- Wormhole Distortion Shader Pass ---
@@ -923,11 +447,10 @@ function toggleWireframes() {
       const meteors = new THREE.Points(meteorGeo, meteorMat);
       // ----------------- END Meteor Shower Setup -----------------
       const scene = new THREE.Scene();
-
       const camera = new THREE.PerspectiveCamera(
         75,
         window.innerWidth / window.innerHeight,
-        5,
+        0.1,
         2000
       );
       camera.position.z = 30;
@@ -941,9 +464,9 @@ function toggleWireframes() {
       const renderPass = new THREE.RenderPass(scene, camera);
       const bloomPass = new THREE.UnrealBloomPass(
         new THREE.Vector2(window.innerWidth, window.innerHeight),
-        2.0, // strength
-        0.5, // radius
-        0.9 // threshold
+        1.5, // strength
+        0.4, // radius
+        0.85 // threshold
       );
       composer.addPass(renderPass);
       composer.addPass(bloomPass);
@@ -973,28 +496,19 @@ function toggleWireframes() {
         uniform sampler2D tDiffuse;
         uniform float strength;
         varying vec2 vUv;
-
         void main() {
-          vec2 uv = vUv * 2.0 - 1.0; // center at (0,0)
-
-          // Create an oval shaped mask
-          float x = uv.x * 1.5;  // horizontal stretch
-          float y = uv.y * 1.0;  // vertical normal
-          float len = sqrt(x*x + y*y);
-
-          // Soften distortion between 0.2 to 1.0 instead of harsh
-          float distortion = smoothstep(0.2, 1.0, len);
-          float factor = 1.0 + strength * pow(distortion, 2.0) * 1.5;
-
-          vec2 distortedUv = uv / factor + 0.5;
-          gl_FragColor = texture2D(tDiffuse, distortedUv);
+          vec2 p = vUv * 2.0 - 1.0;
+          float len = length(p);
+          float distortion = smoothstep(0.4, 1.0, len); // distortion starts later, near the edge
+          float factor = 1.0 + strength * distortion * distortion * 2.0;
+          vec2 uv = p / factor + 0.5;
+          gl_FragColor = texture2D(tDiffuse, uv);
         }
       `,
       };
       const fisheyePass = new THREE.ShaderPass(fisheyeShader);
       fisheyePass.enabled = false;
       composer.addPass(fisheyePass);
-      composer.addPass(invertPass);
 
       // --- Glitch Pass (subtle, momentary, controlled by glitchMode) ---
       // We define glitchPass here so it's available to animate().
@@ -1030,162 +544,151 @@ function toggleWireframes() {
         retractStep();
       }
 
-      // --- Time scaling global variables ---
-      let timeScale = 0.6;
-      let choppySpeedEnabled = false;
-      let displayedTimeScale = 0.6;
-
       // Keyboard event: change color palette with key presses and toggle control map
-window.addEventListener("keydown", (e) => {
-  console.log("Key pressed:", e.key);
-  switch (e.key) {
-    case "ArrowLeft":
-      targetYawAngle = Math.max(-Math.PI, targetYawAngle - 0.05);
-      break;
-    case "ArrowRight":
-      targetYawAngle = Math.min(Math.PI, targetYawAngle + 0.05);
-      break;
-    case "ArrowUp":
-      targetTiltAngle = Math.max(-Math.PI/2 + 0.1, targetTiltAngle - 0.05);
-      break;
-    case "ArrowDown":
-      targetTiltAngle = Math.min(Math.PI/2 - 0.1, targetTiltAngle + 0.05);
-      break;
-    case "=":
-    case "+":
-      timeScale += 0.05;
-      timeScale = Math.min(timeScale, 5.0);
-      break;
-    case "-":
-    case "_":
-      timeScale -= 0.05;
-      timeScale = Math.max(timeScale, 0.1);
-      break;
-    case "0":
-      timeScale = 1.0;
-      break;
-    case "[":
-      targetZoom -= 1.5;
-      targetZoom = Math.max(5, Math.min(150, targetZoom));
-      break;
-    case "]":
-      targetZoom += 1.5;
-      targetZoom = Math.max(5, Math.min(150, targetZoom));
-      break;
-    // (leave the other key cases unchanged below this point)
-    case "n":
-      invertPass.enabled = !invertPass.enabled;
-      if (typeof setButtonHighlight === "function")
-        setButtonHighlight("n");
-      break;
-    case "r": // Red tones
-      updatePalette(0.0);
-      break;
-    case "g":
-      glitchPass.enabled = true;
-      document.getElementById("glitchIndicator").style.display = "block";
-      break;
-    case "h":
-      updatePalette(0.33);
-      break;
-    case "u":
-      choppySpeedEnabled = !choppySpeedEnabled;
-      break;
-    case "b": // Blue tones
-      updatePalette(0.66);
-      break;
-    case "p": // Purple/pink tones
-      updatePalette(0.85);
-      break;
-    // --- ADD Q KEY FOR RANDOM OUTLINES ---
-    case "q":
-      toggleRandomWireframes();
-      if (typeof setButtonHighlight === "function")
-        setButtonHighlight("q");
-      break;
-    // --- END Q KEY ---
-    case "y": // Yellow/orange tones
-      updatePalette(0.12);
-      break;
-    case "c": // Toggle contrast by increasing emissive intensity
-      shapes.forEach((mesh) => {
-        mesh.material.emissiveIntensity =
-          mesh.material.emissiveIntensity === 1 ? 4 : 1;
+      window.addEventListener("keydown", (e) => {
+        switch (e.key.toLowerCase()) {
+          case "arrowleft":
+            targetYawAngle = Math.max(-Math.PI, targetYawAngle - 0.05);
+            break;
+          case "arrowright":
+            targetYawAngle = Math.min(Math.PI, targetYawAngle + 0.05);
+            break;
+          case "arrowup":
+            targetTiltAngle = Math.max(
+              -Math.PI / 2 + 0.1,
+              targetTiltAngle - 0.05
+            );
+            break;
+          case "arrowdown":
+            targetTiltAngle = Math.min(
+              Math.PI / 2 - 0.1,
+              targetTiltAngle + 0.05
+            );
+            break;
+          case "n":
+            invertPass.enabled = !invertPass.enabled;
+            if (typeof setButtonHighlight === "function")
+              setButtonHighlight("n");
+            break;
+          case "r": // Red tones
+            updatePalette(0.0);
+            break;
+          case "g":
+            glitchPass.enabled = true;
+            document.getElementById("glitchIndicator").style.display = "block";
+            break;
+          case "h":
+            updatePalette(0.33);
+            break;
+          case "b": // Blue tones
+            updatePalette(0.66);
+            break;
+          case "p": // Purple/pink tones
+            updatePalette(0.85);
+            break;
+          case "y": // Yellow/orange tones
+            updatePalette(0.12);
+            break;
+          case "c": // Toggle contrast by increasing emissive intensity
+            shapes.forEach((mesh) => {
+              mesh.material.emissiveIntensity =
+                mesh.material.emissiveIntensity === 1 ? 4 : 1;
+            });
+            break;
+          case "d":
+            colorLights.forEach((light) => {
+              light.intensity = light.intensity > 0.5 ? 0.05 : 3;
+            });
+            shapes.forEach((mesh) => {
+              mesh.material.color.setScalar(
+                mesh.material.color.getHex() > 0x222222 ? 0.1 : 1
+              );
+            });
+            if (typeof setButtonHighlight === "function")
+              setButtonHighlight("d");
+            break;
+          case "w":
+            shapes.forEach((mesh) => {
+              const hsl = {};
+              mesh.material.color.getHSL(hsl);
+              mesh.material.color.setHSL(hsl.h, 0.05, hsl.l);
+              mesh.material.emissive.setHSL(hsl.h, 0.05, hsl.l);
+            });
+            break;
+          case "x": // Randomize everything
+            updatePalette(Math.random());
+            shapes.forEach((mesh) => {
+              mesh.material.emissive.setHSL(Math.random(), 1, 0.5);
+              mesh.material.emissiveIntensity = 1 + Math.random() * 4;
+            });
+            break;
+          case "m":
+            trailsEnabled = !trailsEnabled;
+            break;
+          case "1":
+            cameraMode = "orbit";
+            break;
+          case "2":
+            cameraMode = "zoom";
+            break;
+          case "3":
+            cameraMode = "top";
+            break;
+          case "[":
+            if (cameraMode !== "zoom") {
+              manualZoom -= 1.5;
+              manualZoom = Math.max(5, Math.min(150, manualZoom));
+            } else {
+              zoomVelocity = -0.8;
+            }
+            break;
+          case "]":
+            if (cameraMode !== "zoom") {
+              manualZoom += 1.5;
+              manualZoom = Math.max(5, Math.min(150, manualZoom));
+            } else {
+              zoomVelocity = 0.8;
+            }
+            break;
+          case "f":
+            fisheyePass.enabled = !fisheyePass.enabled;
+            break;
+          case "e":
+            triggerExplosion();
+            break;
+          case "k":
+            triggerRepelExplosion();
+            break;
+          case "l":
+            triggerRetract();
+            break;
+          case "v":
+            wormholePass.enabled = !wormholePass.enabled;
+            break;
+          // --- Keyboard zoom in/out ---
+          case "=": // zoom in
+          case "+":
+            zoomVelocity -= 0.08;
+            break;
+          case "-":
+          case "_":
+            zoomVelocity += 0.08;
+            break;
+          // --- Slower zoom velocity adjustment ---
+          case "[":
+            zoomVelocity -= 0.02; // slower zoom in
+            break;
+          case "]":
+            zoomVelocity += 0.02; // slower zoom out
+            break;
+          // --- Toggle control map panel ---
+          case "?":
+          case "h":
+            const cm = document.getElementById("controlMap");
+            cm.style.display = cm.style.display === "none" ? "block" : "none";
+            break;
+        }
       });
-      break;
-    case "d":
-      colorLights.forEach((light) => {
-        light.intensity = light.intensity > 0.5 ? 0.05 : 3;
-      });
-      shapes.forEach((mesh) => {
-        mesh.material.color.setScalar(
-          mesh.material.color.getHex() > 0x222222 ? 0.1 : 1
-        );
-      });
-      if (typeof setButtonHighlight === "function")
-        setButtonHighlight("d");
-      break;
-    case "w":
-      shapes.forEach((mesh) => {
-        const hsl = {};
-        mesh.material.color.getHSL(hsl);
-        mesh.material.color.setHSL(hsl.h, 0.05, hsl.l);
-        mesh.material.emissive.setHSL(hsl.h, 0.05, hsl.l);
-      });
-      break;
-    case "x": // Randomize everything
-      updatePalette(Math.random());
-      shapes.forEach((mesh) => {
-        mesh.material.emissive.setHSL(Math.random(), 1, 0.5);
-        mesh.material.emissiveIntensity = 1 + Math.random() * 4;
-      });
-      break;
-    case "m":
-      trailsEnabled = !trailsEnabled;
-      break;
-    case "1":
-      cameraMode = "orbit";
-      break;
-    case "2":
-      cameraMode = "zoom";
-      break;
-    case "3":
-      cameraMode = "top";
-      break;
-    case "f":
-      fisheyePass.enabled = !fisheyePass.enabled;
-      break;
-    case "e":
-      triggerExplosion();
-      break;
-    case "k":
-      triggerRepelExplosion();
-      break;
-    case "l":
-      triggerRetract();
-      break;
-    case "v":
-      wormholePass.enabled = !wormholePass.enabled;
-      break;
-    // --- Toggle control map panel ---
-    case "?":
-    case "h":
-      const cm = document.getElementById("controlMap");
-      cm.style.display = cm.style.display === "none" ? "block" : "none";
-      break;
-    // --- Add s and t key support for god ray spread/tighten ---
-    case "s":
-      godRaySpreadFactor += 2;
-      if (godRaySpreadFactor > 20) godRaySpreadFactor = 6;
-      regenerateTemple();
-      if (typeof setButtonHighlight === "function") setButtonHighlight("s");
-      break;
-    case "t":
-      tightenGodRays();
-      if (typeof setButtonHighlight === "function") setButtonHighlight("t");
-      break;
-  }
-});
 
       window.addEventListener("keyup", (e) => {
         if (e.key.toLowerCase() === "g") {
@@ -1303,18 +806,6 @@ window.addEventListener("keydown", (e) => {
       // Sacred Geometry: nested rotating tori + procedural sacred temple generator
       const sacredGroup = new THREE.Group();
       function regenerateTemple() {
-        // --- Preserve wireframe states of sacredGroup children by order ---
-        let savedWireframeStates = [];
-        sacredGroup.children.forEach(child => {
-          if (child.material) {
-            savedWireframeStates.push({
-              isMesh: child.isMesh,
-              isPoints: child.isPoints,
-              isLine: child.isLine,
-              wireframe: (Array.isArray(child.material) ? child.material[0] : child.material).wireframe || false
-            });
-          }
-        });
         // Remove all children
         while (sacredGroup.children.length)
           sacredGroup.remove(sacredGroup.children[0]);
@@ -1341,24 +832,13 @@ window.addEventListener("keydown", (e) => {
             rayMaterial
           );
           cone.position.set(
-            Math.sin(i * 2) * godRaySpreadFactor,
-            (Math.random() - 0.5) * 3,
-            Math.cos(i * 2) * godRaySpreadFactor
+            Math.sin(i * 2) * 6,
+            Math.random() * 3 - 1.5,
+            Math.cos(i * 2) * 6
           );
           cone.rotation.x = Math.PI / 2;
-          cone.rotation.y = (i / godRayCount) * Math.PI * 2 + Math.random() * (0.2 + godRaySpreadFactor * 0.01);
+          cone.rotation.y = (i / godRayCount) * Math.PI * 2;
           sacredGroup.add(cone);
-          // --- Restore wireframe state by order ---
-          const saved = savedWireframeStates.shift();
-          if (saved && (cone.isMesh || cone.isPoints || cone.isLine)) {
-            if (Array.isArray(cone.material)) {
-              cone.material.forEach((mat) => {
-                if ('wireframe' in mat) mat.wireframe = saved.wireframe;
-              });
-            } else if ('wireframe' in cone.material) {
-              cone.material.wireframe = saved.wireframe;
-            }
-          }
         }
 
         // --- Dramatic Sacred Tori ---
@@ -1383,17 +863,6 @@ window.addEventListener("keydown", (e) => {
           torus.rotation.z = Math.random() * Math.PI * 2;
           torus.scale.setScalar(0.8 + Math.random() * 1.5);
           sacredGroup.add(torus);
-          // --- Restore wireframe state by order ---
-          const saved = savedWireframeStates.shift();
-          if (saved && (torus.isMesh || torus.isPoints || torus.isLine)) {
-            if (Array.isArray(torus.material)) {
-              torus.material.forEach((mat) => {
-                if ('wireframe' in mat) mat.wireframe = saved.wireframe;
-              });
-            } else if ('wireframe' in torus.material) {
-              torus.material.wireframe = saved.wireframe;
-            }
-          }
           // Store original vertices for mutation
           torus.userData.originalVertices =
             torus.geometry.attributes.position.array.slice();
@@ -1420,17 +889,6 @@ window.addEventListener("keydown", (e) => {
             Math.random() * Math.PI
           );
           sacredGroup.add(mesh);
-          // --- Restore wireframe state by order ---
-          const saved = savedWireframeStates.shift();
-          if (saved && (mesh.isMesh || mesh.isPoints || mesh.isLine)) {
-            if (Array.isArray(mesh.material)) {
-              mesh.material.forEach((mat) => {
-                if ('wireframe' in mat) mat.wireframe = saved.wireframe;
-              });
-            } else if ('wireframe' in mesh.material) {
-              mesh.material.wireframe = saved.wireframe;
-            }
-          }
           // Store original vertices for mutation
           mesh.userData.originalVertices =
             mesh.geometry.attributes.position.array.slice();
@@ -1462,17 +920,6 @@ window.addEventListener("keydown", (e) => {
             Math.random() * Math.PI
           );
           sacredGroup.add(spike);
-          // --- Restore wireframe state by order ---
-          const saved = savedWireframeStates.shift();
-          if (saved && (spike.isMesh || spike.isPoints || spike.isLine)) {
-            if (Array.isArray(spike.material)) {
-              spike.material.forEach((mat) => {
-                if ('wireframe' in mat) mat.wireframe = saved.wireframe;
-              });
-            } else if ('wireframe' in spike.material) {
-              spike.material.wireframe = saved.wireframe;
-            }
-          }
           spike.userData.originalVertices =
             spike.geometry.attributes.position.array.slice();
         }
@@ -1532,33 +979,32 @@ window.addEventListener("wheel", (e) => {
             transparent: true,
             blending: THREE.AdditiveBlending,
             depthWrite: false,
-            depthTest: false, // 👈 added
           })
         );
         orbitLines.add(orbitLine);
       }
       scene.add(orbitLines);
 
-// --- Comet Trails for Planets (old bunch-up behavior) ---
-const cometTrailLength = 20;
-const cometTrailData = planets.map(() => []);
-const cometTrailPositions = new Float32Array(
-  planets.length * cometTrailLength * 3
-);
-const cometTrails = new THREE.LineSegments(
-  new THREE.BufferGeometry().setAttribute(
-    "position",
-    new THREE.BufferAttribute(cometTrailPositions, 3)
-  ),
-  new THREE.LineBasicMaterial({
-    color: 0xffccff,
-    transparent: true,
-    opacity: 0.5,
-    blending: THREE.AdditiveBlending,
-    depthWrite: false,
-  })
-);
-scene.add(cometTrails);
+      // --- Comet Trails for Planets ---
+      const cometTrailLength = 20;
+      const cometTrailData = planets.map(() => []);
+      const cometTrailPositions = new Float32Array(
+        planets.length * cometTrailLength * 3
+      );
+      const cometTrails = new THREE.LineSegments(
+        new THREE.BufferGeometry().setAttribute(
+          "position",
+          new THREE.BufferAttribute(cometTrailPositions, 3)
+        ),
+        new THREE.LineBasicMaterial({
+          color: 0xffccff,
+          transparent: true,
+          opacity: 0.5,
+          blending: THREE.AdditiveBlending,
+          depthWrite: false,
+        })
+      );
+      scene.add(cometTrails);
       let trailsEnabled = true;
       // --- Central Spiral Vortex ---
       const vortexGeo = new THREE.RingGeometry(1, 15, 64);
@@ -1570,19 +1016,15 @@ scene.add(cometTrails);
       });
       const vortex = new THREE.Mesh(vortexGeo, vortexMat);
       vortex.rotation.x = Math.PI / 2;
-      // Make the vortex larger and place it closer to center for enhanced central glow layering
-      vortex.scale.set(2.5, 2.5, 2.5);
-      vortex.position.y = -1;
+      vortex.position.y = -5;
       scene.add(vortex);
 
       // --- Orbiting Glyphs around Sacred Group ---
-      const runeTextures = [
-        new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/disc.png"),
-        new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/circle.png"),
-        new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/square.png")
-      ];
+      const runeTexture = new THREE.TextureLoader().load(
+        "https://threejs.org/examples/textures/sprites/disc.png"
+      );
       const runeMat = new THREE.SpriteMaterial({
-        map: runeTextures[0],
+        map: runeTexture,
         color: 0xff00ff,
       });
       const glyphs = [];
@@ -1592,14 +1034,6 @@ scene.add(cometTrails);
         scene.add(sprite);
         glyphs.push({ sprite, angle: i * ((Math.PI * 2) / 12), radius: 25 });
       }
-
-      // Periodically randomize glyph textures
-      setInterval(() => {
-        glyphs.forEach((g) => {
-          g.sprite.material.map = runeTextures[Math.floor(Math.random() * runeTextures.length)];
-          g.sprite.material.needsUpdate = true;
-        });
-      }, 7000);
 
       // --- Mirrored Reflective Floor ---
       const floorMat = new THREE.MeshPhongMaterial({
@@ -1611,8 +1045,7 @@ scene.add(cometTrails);
       });
       const floor = new THREE.Mesh(new THREE.PlaneGeometry(500, 500), floorMat);
       floor.rotation.x = -Math.PI / 2;
-      floor.position.y = -100; // lower the floor
-      floor.material.depthWrite = false; // disable depth writing
+      floor.position.y = -20;
       scene.add(floor);
 
       const glassMat = new THREE.MeshPhysicalMaterial({
@@ -1739,34 +1172,13 @@ scene.add(cometTrails);
       const waterFlow = new THREE.Points(waterGeo, waterMat);
       scene.add(waterFlow);
 
-      // --- Space background with reliable texture and async loading (fully refactored) ---
-      const textureLoader = new THREE.TextureLoader();
-      const spaceTexture = textureLoader.load(
-        "./assets/starfield.png",
-        () => {
-          console.log("✅ Background texture loaded.");
-          spaceTexture.needsUpdate = true;
-        },
-        undefined,
-        (err) => {
-          console.warn("❌ Background texture failed to load:", err);
-        }
+      const spaceTexture = new THREE.TextureLoader().load(
+        "https://cdn.jsdelivr.net/gh/mrdoob/three.js@master/examples/textures/cube/MilkyWay/dark-s_px.jpg"
       );
-
-      const skyMaterial = new THREE.MeshBasicMaterial({
-        map: spaceTexture,
-        side: THREE.BackSide,
-        depthWrite: false,
-        depthTest: false,
-        transparent: false,
-      });
-
       const skySphere = new THREE.Mesh(
         new THREE.SphereGeometry(1000, 64, 64),
-        skyMaterial
+        new THREE.MeshBasicMaterial({ map: spaceTexture, side: THREE.BackSide })
       );
-
-      skySphere.renderOrder = -1;
       scene.add(skySphere);
 
       // --- Explosion sound, sparks, and camera shake ---
@@ -1839,24 +1251,7 @@ scene.add(cometTrails);
       glitchPass.material.uniforms["distortion_y"].value = 0.8;
       glitchPass.material.uniforms["col_s"].value = 0.002;
 
-      // --- Time accumulator for time scaling ---
-      let timeAccumulator = 0;
-      let lastTime = performance.now();
-
       function animate() {
-        // Smooth interpolation for time scale (for smooth time flow)
-        if (choppySpeedEnabled) {
-          displayedTimeScale += (timeScale - displayedTimeScale) * 0.05;
-        } else {
-          displayedTimeScale = timeScale;
-        }
-        // Use displayedTimeScale for all time calculations
-        const currentTime = performance.now();
-        const delta = (currentTime - lastTime) / 1000; // seconds
-        lastTime = currentTime;
-        timeAccumulator += delta * displayedTimeScale;
-        const now = timeAccumulator * 1000; // keep existing ms logic
-
         tiltAngle += (targetTiltAngle - tiltAngle) * 0.1;
         yawAngle += (targetYawAngle - yawAngle) * 0.1;
         requestAnimationFrame(animate);
@@ -1867,47 +1262,22 @@ scene.add(cometTrails);
 
         sacredGroup.children.forEach((child, index) => {
           if (child.geometry && child.geometry.type === "TorusGeometry") {
-            child.rotation.z += (index % 2 === 0 ? 1 : -1) * 0.01 * displayedTimeScale;
+            child.rotation.z += (index % 2 === 0 ? 1 : -1) * 0.01;
           }
         });
         shapes.forEach((shape, i) => {
-          shape.rotation.x += (0.002 + i * 0.0001) * displayedTimeScale;
-          shape.rotation.y += (0.003 + i * 0.0001) * displayedTimeScale;
+          shape.rotation.x += 0.002 + i * 0.0001;
+          shape.rotation.y += 0.003 + i * 0.0001;
         });
 
-        // --- Subtle sacred group drift to prevent stacking at center ---
-        sacredGroup.position.x = Math.sin(now * 0.0001) * 0.05;
-        sacredGroup.position.z = Math.cos(now * 0.0001) * 0.05;
+        if (Math.floor(Date.now() / 5000) % 2 === 0) {
+          shapes.forEach((mesh) => (mesh.material.wireframe = true));
+        } else {
+          shapes.forEach((mesh) => (mesh.material.wireframe = false));
+        }
 
-        if (allowAutoWireframeAnimation) {
-          if (Math.floor(now / 5000) % 2 === 0) {
-            shapes.forEach((mesh) => (mesh.material.wireframe = true));
-          } else {
-            shapes.forEach((mesh) => (mesh.material.wireframe = false));
-          }
-        }
-        // else {
-        //   console.log("[RandomOutline] Auto wireframe disabled");
-        // }
-        sacredGroup.rotation.y += 0.006 * displayedTimeScale;
-        sacredGroup.rotation.z += 0.003 * displayedTimeScale;
-        sacredGroup.position.y = -2;
-        // --- Add central distortion orb to reduce whiteout ---
-        if (!window.centralDistortionOrb) {
-          const orbMat = new THREE.MeshStandardMaterial({
-            color: 0xff00ff,
-            emissive: 0x550055,
-            roughness: 0.3,
-            metalness: 0.7,
-            transparent: true,
-            opacity: 0.8
-          });
-          const orbGeo = new THREE.SphereGeometry(3, 32, 32);
-          const orbMesh = new THREE.Mesh(orbGeo, orbMat);
-          orbMesh.position.set(0, -2, 0);
-          scene.add(orbMesh);
-          window.centralDistortionOrb = orbMesh;
-        }
+        sacredGroup.rotation.y += 0.002;
+        sacredGroup.rotation.z += 0.001;
         // --- Sacred geometry mutation: vertex displacement animation ---
         sacredGroup.children.forEach((child) => {
           if (child.geometry && child.geometry.attributes.position) {
@@ -1917,15 +1287,15 @@ scene.add(cometTrails);
               for (let i = 0; i < pos.count; i++) {
                 pos.setX(
                   i,
-                  orig[i * 3] + Math.sin(now * 0.001 + i) * 0.2
+                  orig[i * 3] + Math.sin(Date.now() * 0.001 + i) * 0.2
                 );
                 pos.setY(
                   i,
-                  orig[i * 3 + 1] + Math.cos(now * 0.001 + i) * 0.2
+                  orig[i * 3 + 1] + Math.cos(Date.now() * 0.001 + i) * 0.2
                 );
                 pos.setZ(
                   i,
-                  orig[i * 3 + 2] + Math.sin(now * 0.001 + i) * 0.2
+                  orig[i * 3 + 2] + Math.sin(Date.now() * 0.001 + i) * 0.2
                 );
               }
               pos.needsUpdate = true;
@@ -1937,8 +1307,8 @@ scene.add(cometTrails);
         // --- Meteor Shower Animation ---
         const mp = meteorGeo.attributes.position.array;
         for (let i = 0; i < meteorCount; i++) {
-          mp[i * 3 + 1] += meteorVel[i * 3 + 1] * displayedTimeScale;
-          mp[i * 3 + 0] += Math.sin(now * 0.001 + i) * 0.05 * displayedTimeScale;
+          mp[i * 3 + 1] += meteorVel[i * 3 + 1];
+          mp[i * 3 + 0] += Math.sin(Date.now() * 0.001 + i) * 0.05;
           if (mp[i * 3 + 1] < -100) {
             mp[i * 3 + 1] = Math.random() * 100 + 100;
             mp[i * 3 + 0] = Math.random() * 200 - 100;
@@ -1947,106 +1317,64 @@ scene.add(cometTrails);
         meteorGeo.attributes.position.needsUpdate = true;
 
         // Animate orbiting glyphs
-        glyphs.forEach((g, i) => {
-          g.angle += 0.002 * displayedTimeScale;
-
-          // Pulsing size effect
-          const pulse = 1 + Math.sin(now * 0.002 + i) * 0.3;
-          g.sprite.scale.set(5 * pulse, 5 * pulse, 1);
-
-          // Orbit position
+        glyphs.forEach((g) => {
+          g.angle += 0.002;
           g.sprite.position.set(
             Math.cos(g.angle) * g.radius,
             10,
             Math.sin(g.angle) * g.radius
           );
-
-          // Animate opacity (glow effect)
-          g.sprite.material.opacity = 0.5 + Math.sin(now * 0.003 + i) * 0.3;
-
-          // Animate color hue drift
-          g.sprite.material.color.setHSL(
-            0.8 + Math.sin(now * 0.001 + i) * 0.05, // hue drift
-            1,
-            0.6
-          );
         });
 
-        // Animate stationary rune sprites (pinkish-blue outlined ones)
-        scene.children.forEach((child) => {
-          if (child.isSprite && !glyphs.some(g => g.sprite === child)) {
-            // Only affect stationary runes, not orbiting glyphs
-            const material = child.material;
-            if (material && material.color) {
-              const hsl = {};
-              material.color.getHSL(hsl);
-              const brightness = 0.5 + Math.sin(now * 0.0015 + child.id) * 0.3;
-              material.color.setHSL(hsl.h, hsl.s, brightness);
-            }
-          }
-        });
-
-        // Animate pink stationary particles (glitter field)
-        if (glitter && glitter.geometry && glitter.geometry.attributes.color) {
-          const colors = glitter.geometry.attributes.color;
-          for (let i = 0; i < colors.count; i++) {
-            const r = colors.getX(i);
-            const g = colors.getY(i);
-            const b = colors.getZ(i);
-
-            // Detect if it's pinkish (hue ~0.8–0.95)
-            const color = new THREE.Color(r, g, b);
-            const hsl = {};
-            color.getHSL(hsl);
-
-            if (hsl.h > 0.8 && hsl.h < 0.95) {
-              // Animate brightness based on time
-              const brightness = 0.5 + Math.sin(now * 0.002 + i) * 0.3;
-              const newColor = new THREE.Color();
-              newColor.setHSL(hsl.h, hsl.s, brightness);
-
-              colors.setXYZ(i, newColor.r, newColor.g, newColor.b);
-            }
-          }
-          colors.needsUpdate = true;
-        }
-
-        planets.forEach((planet, i) => {
-          planet.userData.angle += planet.userData.speed * timeScale;
-          const angle = planet.userData.angle;
-          planet.position.set(
-            Math.cos(angle) * planet.userData.radius,
+        planets.forEach((p) => {
+          p.userData.angle += p.userData.speed;
+          p.position.set(
+            Math.cos(p.userData.angle) * p.userData.radius,
             0,
-            Math.sin(angle) * planet.userData.radius
+            Math.sin(p.userData.angle) * p.userData.radius
           );
-
-          const trail = cometTrailData[i];
-          trail.push(planet.position.clone());
-          if (trail.length > cometTrailLength) trail.shift();
-
-          for (let j = 0; j < trail.length - 1; j++) {
-            const idx = (i * cometTrailLength + j) * 3;
-            cometTrailPositions[idx] = trail[j].x;
-            cometTrailPositions[idx + 1] = trail[j].y;
-            cometTrailPositions[idx + 2] = trail[j].z;
-          }
         });
-        cometTrails.geometry.attributes.position.needsUpdate = true;
+
+        // --- Animate Comet Trails ---
+        if (trailsEnabled) {
+          for (let i = 0; i < planets.length; i++) {
+            cometTrailData[i].push(planets[i].position.clone());
+            if (cometTrailData[i].length > cometTrailLength) {
+              cometTrailData[i].shift();
+            }
+            const trail = cometTrailData[i];
+            for (let j = 0; j < cometTrailLength; j++) {
+              const idx = (i * cometTrailLength + j) * 3;
+              if (j < trail.length) {
+                // Exaggerate the trail by increasing distance from center
+                const exaggerated = trail[j].clone().multiplyScalar(1.5);
+                cometTrailPositions[idx] = exaggerated.x;
+                cometTrailPositions[idx + 1] = exaggerated.y;
+                cometTrailPositions[idx + 2] = exaggerated.z;
+              } else {
+                cometTrailPositions[idx] = 0;
+                cometTrailPositions[idx + 1] = 0;
+                cometTrailPositions[idx + 2] = 0;
+              }
+            }
+          }
+          cometTrails.geometry.attributes.position.needsUpdate = true;
+        }
 
         colorLights.forEach((light) => {
           light.color.setHSL(Math.random(), 1, 0.5);
-          light.intensity = 1 + Math.sin(now * 0.001) * 0.5;
+          light.intensity = 1 + Math.sin(Date.now() * 0.001) * 0.5;
         });
 
         // Animate fisheye intensity
         if (fisheyePass.enabled) {
           fisheyePass.uniforms.strength.value =
-            0.4 + Math.sin(now * 0.001) * 0.2;
+            0.4 + Math.sin(Date.now() * 0.001) * 0.2;
         }
 
         // Animate wormhole shader time
         if (wormholePass.enabled) {
-          wormholePass.uniforms.time.value += 0.01 * displayedTimeScale;
+          wormholePass.uniforms.time.value += 0.01;
         }
 
         // --- Camera mode logic: Enable OrbitControls only in orbit mode ---
@@ -2059,10 +1387,10 @@ scene.add(cometTrails);
 
         if (cameraMode === "zoom") {
           zoomVelocity *= 0.93; // slower decay for glide
-          manualZoom += (targetZoom - manualZoom) * 0.1; // Smooth interpolation
+          manualZoom += zoomVelocity;
           manualZoom = Math.max(5, Math.min(150, manualZoom)); // clamp zoom range
 
-          const t = now * 0.0005;
+          const t = Date.now() * 0.0005;
           camera.position.set(
             Math.cos(t) * manualZoom,
             Math.sin(t * 0.7) * manualZoom * 0.4,
@@ -2071,7 +1399,7 @@ scene.add(cometTrails);
           camera.lookAt(scene.position);
         } else if (cameraMode === "top") {
           // Top-down orbital glide: dynamic X, Y, Z
-          const t = now * 0.0003;
+          const t = Date.now() * 0.0003;
           const radius = 60 + Math.sin(t * 2.0) * 20;
           camera.position.set(
             Math.cos(t) * radius,
@@ -2086,13 +1414,13 @@ scene.add(cometTrails);
           for (let i = 0; i < sparkCount; i++) {
             let x =
               sparkGeo.attributes.position.getX(i) +
-              sparkVelocities[i * 3 + 0] * 0.1 * displayedTimeScale;
+              sparkVelocities[i * 3 + 0] * 0.1;
             let y =
               sparkGeo.attributes.position.getY(i) +
-              sparkVelocities[i * 3 + 1] * 0.1 * displayedTimeScale;
+              sparkVelocities[i * 3 + 1] * 0.1;
             let z =
               sparkGeo.attributes.position.getZ(i) +
-              sparkVelocities[i * 3 + 2] * 0.1 * displayedTimeScale;
+              sparkVelocities[i * 3 + 2] * 0.1;
             sparkGeo.attributes.position.setXYZ(i, x, y, z);
             sparkVelocities[i * 3 + 0] *= 0.94;
             sparkVelocities[i * 3 + 1] *= 0.94;
@@ -2105,9 +1433,9 @@ scene.add(cometTrails);
         if (smokeActive && smokeGeo && smokeVel) {
           const pos = smokeGeo.attributes.position.array;
           for (let i = 0; i < smokeParticles; i++) {
-            pos[i * 3 + 0] += smokeVel[i * 3 + 0] * 0.1 * displayedTimeScale;
-            pos[i * 3 + 1] += smokeVel[i * 3 + 1] * 0.1 * displayedTimeScale;
-            pos[i * 3 + 2] += smokeVel[i * 3 + 2] * 0.1 * displayedTimeScale;
+            pos[i * 3 + 0] += smokeVel[i * 3 + 0] * 0.1;
+            pos[i * 3 + 1] += smokeVel[i * 3 + 1] * 0.1;
+            pos[i * 3 + 2] += smokeVel[i * 3 + 2] * 0.1;
             smokeVel[i * 3 + 0] *= 0.96;
             smokeVel[i * 3 + 1] *= 0.96;
             smokeVel[i * 3 + 2] *= 0.96;
@@ -2119,9 +1447,9 @@ scene.add(cometTrails);
         if (glitterBurstActive && glitterBurstGeo && glitterBurstVel) {
           const pos = glitterBurstGeo.attributes.position.array;
           for (let i = 0; i < glitterBurstParticles; i++) {
-            pos[i * 3 + 0] += glitterBurstVel[i * 3 + 0] * 0.13 * displayedTimeScale;
-            pos[i * 3 + 1] += glitterBurstVel[i * 3 + 1] * 0.13 * displayedTimeScale;
-            pos[i * 3 + 2] += glitterBurstVel[i * 3 + 2] * 0.13 * displayedTimeScale;
+            pos[i * 3 + 0] += glitterBurstVel[i * 3 + 0] * 0.13;
+            pos[i * 3 + 1] += glitterBurstVel[i * 3 + 1] * 0.13;
+            pos[i * 3 + 2] += glitterBurstVel[i * 3 + 2] * 0.13;
             glitterBurstVel[i * 3 + 0] *= 0.93;
             glitterBurstVel[i * 3 + 1] *= 0.93;
             glitterBurstVel[i * 3 + 2] *= 0.93;
@@ -2138,17 +1466,16 @@ scene.add(cometTrails);
         controls.update();
         controls.update();
         composer.render();
-        // renderer.render(scene, camera);
-        glitter.rotation.y += 0.006 * displayedTimeScale;
-        glitter.rotation.x += 0.003 * displayedTimeScale;
+        glitter.rotation.y += 0.002;
+        glitter.rotation.x += 0.001;
         // Animate the water flow effect
-        waterFlow.rotation.y += 0.001 * displayedTimeScale;
-        waterFlow.rotation.x += 0.0005 * displayedTimeScale;
+        waterFlow.rotation.y += 0.001;
+        waterFlow.rotation.x += 0.0005;
 
-        skySphere.rotation.y += 0.0005 * displayedTimeScale;
+        skySphere.rotation.y += 0.0005;
 
         // Animate vortex spiral
-        vortex.rotation.z += 0.002 * displayedTimeScale;
+        vortex.rotation.z += 0.002;
 
         orbitLines.rotation.x = tiltAngle;
         orbitLines.rotation.y = yawAngle;
@@ -2158,16 +1485,12 @@ scene.add(cometTrails);
 
         // Animate camera y position unless in orbit mode
         if (cameraMode !== "orbit") {
-          camera.position.y = Math.sin(now * 0.001) * 0.5;
+          camera.position.y = Math.sin(Date.now() * 0.001) * 0.5;
         }
-
-        // Optionally: show timeScale somewhere? (Not required.)
       }
 
       // --- Explosion effect ---
       function triggerExplosion() {
-        glyphs.forEach(g => g.radius += 1.5);
-planets.forEach(p => p.userData.radius += 1.5);
         explosionSound.play();
         shapes.forEach((mesh, i) => {
           // Particle burst per shape on explosion
@@ -2258,15 +1581,6 @@ planets.forEach(p => p.userData.radius += 1.5);
         }
         sparkGeo.attributes.position.needsUpdate = true;
         sparkActive = true;
-        // --- Cleanup lingering sparks after 3s ---
-        setTimeout(() => {
-          if (sparks) {
-            scene.remove(sparks);
-            if (sparks.geometry) sparks.geometry.dispose();
-            if (sparks.material) sparks.material.dispose();
-            sparks = null;
-          }
-        }, 3000); // 3 seconds
 
         // --- Glitter burst ---
         {
@@ -2317,15 +1631,6 @@ planets.forEach(p => p.userData.radius += 1.5);
               glitterBurstActive = false;
             }
           }, 1200);
-          // --- Cleanup lingering glitterBurst after 3s ---
-          setTimeout(() => {
-            if (glitterBurst) {
-              scene.remove(glitterBurst);
-              if (glitterBurst.geometry) glitterBurst.geometry.dispose();
-              if (glitterBurst.material) glitterBurst.material.dispose();
-              glitterBurst = null;
-            }
-          }, 3000);
         }
 
         // --- Smoke burst ---
@@ -2367,15 +1672,6 @@ planets.forEach(p => p.userData.radius += 1.5);
               smokeActive = false;
             }
           }, 1800);
-          // --- Cleanup lingering smoke after 3s ---
-          setTimeout(() => {
-            if (smoke) {
-              scene.remove(smoke);
-              if (smoke.geometry) smoke.geometry.dispose();
-              if (smoke.material) smoke.material.dispose();
-              smoke = null;
-            }
-          }, 3000);
         }
 
         let explosionTime = Date.now();
@@ -2521,55 +1817,6 @@ planets.forEach(p => p.userData.radius += 1.5);
       // --- REMOVE on-screen glitch toggle button event logic ---
       // (Removed per instructions)
     </script>
-    </div> <!-- end #visualizerApp -->
   </body>
 </html>
 i
-
-        // --- Cleanup lingering sparks after 3s ---
-        setTimeout(() => {
-          if (sparks) {
-            scene.remove(sparks);
-            if (sparks.geometry) sparks.geometry.dispose();
-            if (sparks.material) sparks.material.dispose();
-            sparks = null;
-          }
-        }, 3000); // 3 seconds
-
-        // --- Cleanup lingering glitterBurst after 3s ---
-        setTimeout(() => {
-          if (glitterBurst) {
-            scene.remove(glitterBurst);
-            if (glitterBurst.geometry) glitterBurst.geometry.dispose();
-            if (glitterBurst.material) glitterBurst.material.dispose();
-            glitterBurst = null;
-          }
-        }, 3000);
-
-        // --- Cleanup lingering smoke after 3s ---
-        setTimeout(() => {
-          if (smoke) {
-            scene.remove(smoke);
-            if (smoke.geometry) smoke.geometry.dispose();
-            if (smoke.material) smoke.material.dispose();
-            smoke = null;
-          }
-        }, 3000);
-    case "t":
-      tightenGodRays();
-      break;
-    case "s":
-      console.log("Pressed S - Spread Rays");
-      godRaySpreadFactor += 2;
-      if (godRaySpreadFactor > 20) godRaySpreadFactor = 6;
-      regenerateTemple();
-      if (typeof setButtonHighlight === "function")
-        setButtonHighlight("s");
-      break;
-
-    case "t":
-      console.log("Pressed T - Tighten Rays");
-      tightenGodRays();
-      if (typeof setButtonHighlight === "function")
-        setButtonHighlight("t");
-      break;
