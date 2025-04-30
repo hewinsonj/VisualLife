@@ -6,7 +6,7 @@
     <meta charset="UTF-8" />
     <meta
       name="viewport"
-      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, user-scalable=no"
+      content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, interactive-widget=overlays-content"
     />
     <title>Insane 3D Visualizer</title>
     <style>
@@ -15,9 +15,11 @@
         margin: 0;
         overflow: hidden;
         background: #000;
+        touch-action: manipulation;
       }
       canvas {
         display: block;
+        touch-action: manipulation;
       }
       button {
         -webkit-user-select: none; /* Safari */
