@@ -244,6 +244,7 @@ function toggleRandomWireframes() {
           mesh.material.wireframe = false;
         }
       }
+      
     }
   });
 }
@@ -1833,8 +1834,124 @@ scene.add(cometTrails);
       const waterFlow = new THREE.Points(waterGeo, waterMat);
       scene.add(waterFlow);
 
-      // --- Space background with reliable texture and async loading (fully refactored) ---
+      // --- Flowing Ribbon Setup ---
+      // const curvePath = new THREE.CatmullRomCurve3([
+      //   new THREE.Vector3(-20, 0, -20),
+      //   new THREE.Vector3(-10, 5, 0),
+      //   new THREE.Vector3(0, 0, 20),
+      //   new THREE.Vector3(10, -5, 0),
+      //   new THREE.Vector3(20, 0, -20),
+      // ]);
+      // curvePath.closed = true;
+
+      // Define CatmullRomCurve3 path for flowing ribbon (with increased curvature)
+      const ribbonPath = new THREE.CatmullRomCurve3([
+        new THREE.Vector3(-60, 15, -60),
+        new THREE.Vector3(-30, 30, 0),
+        new THREE.Vector3(0, 15, 60),
+        new THREE.Vector3(30, 0, 0),
+        new THREE.Vector3(60, 15, -60),
+      ]);
+      ribbonPath.closed = true; // Make it a loop
+
+      // Replace BoxGeometry with PlaneGeometry for a more segment-rich ribbon
+      const ribbonGeometry = new THREE.PlaneGeometry(200, 0.1, 800, 1);
+      // --- Ribbon Texture Loading ---
       const textureLoader = new THREE.TextureLoader();
+      const holographicTexture = textureLoader.load('./assets/imar.png');
+      const ribbonMaterial = new THREE.MeshStandardMaterial({
+        map: holographicTexture,
+        color: new THREE.Color(0xffffff), // neutral white to not tint texture
+        metalness: 0.1, // reduce metallic effect to emphasize texture
+        roughness: 0.2, // slight roughness for more natural light reflection
+        side: THREE.DoubleSide,
+        transparent: true,
+        envMapIntensity: 1.5,     // Boost reflection intensity
+
+        opacity: .5, // fully visible
+        wireframe: true  // Set wireframe to true on creation
+      });
+      const ribbonMesh = new THREE.Mesh(ribbonGeometry, ribbonMaterial);
+      // if (ribbonMesh.material && 'wireframe' in ribbonMesh.material) {
+      //   ribbonMesh.material.wireframe = false;
+      // }
+      scene.add(ribbonMesh);
+
+      // --- Store ribbon mesh globally for animation in next steps ---
+      window.ribbon = ribbonMesh;
+      // Ensure ribbon stays in wireframe mode
+      if (window.ribbon && window.ribbon.material) {
+        if (Array.isArray(window.ribbon.material)) {
+          window.ribbon.material.forEach((mat) => {
+            if ('wireframe' in mat) mat.wireframe = true;
+          });
+        } else if ('wireframe' in window.ribbon.material) {
+          window.ribbon.material.wireframe = true;
+        }
+      }
+
+      // --- Animate ribbon to follow the path ---
+      const positions = ribbonGeometry.attributes.position;
+      const pointCount = positions.count;
+      const path = ribbonPath;
+
+      function updateRibbon() {
+        const time = performance.now() * 0.001;
+        // Animate control points over time to create flowing motion
+        const animatedPoints = [          
+          new THREE.Vector3(-60, 15 + Math.sin(time * 2.5) * 5, -60),
+          new THREE.Vector3(-30, 30 + Math.cos(time * 3.0) * 5, 0),
+          new THREE.Vector3(0, 15 + Math.sin(time * 3.2) * 5, 60),
+          new THREE.Vector3(30, 0 + Math.cos(time * 2.8) * 5, 0),
+          new THREE.Vector3(60, 15 + Math.sin(time * 2.4) * 5, -60)
+        ];
+        const dynamicPath = new THREE.CatmullRomCurve3(animatedPoints);
+        dynamicPath.closed = true;
+
+        const positions = ribbonGeometry.attributes.position;
+        const pointCount = positions.count;
+
+        for (let i = 0; i < pointCount; i++) {
+          const u = i / (pointCount - 1);
+          const point = dynamicPath.getPointAt(u);
+          const tangent = dynamicPath.getTangentAt(u).normalize();
+
+          // Create normal and binormal
+          const normal = new THREE.Vector3(0, 1, 0);
+          // --- Use binormal pointing toward average of colorLights ---
+          const ribbonToLight = new THREE.Vector3();
+          const avgLightPosition = new THREE.Vector3();
+          colorLights.forEach(light => avgLightPosition.add(light.position));
+          avgLightPosition.divideScalar(colorLights.length);
+          ribbonToLight.subVectors(avgLightPosition, ribbonMesh.position).normalize();
+
+          const binormal = new THREE.Vector3().crossVectors(tangent, ribbonToLight).normalize();
+
+          const angle = u * Math.PI * 2 + time * 0.5;
+          const twistSin = Math.sin(angle);
+          const twistCos = Math.cos(angle);
+          const dynamicWidth = 0.3 + 0.05 * Math.sin(u * 10 + time);
+
+          const twistedX = binormal.x * twistCos + normal.x * twistSin;
+          const twistedY = binormal.y * twistCos + normal.y * twistSin;
+          const twistedZ = binormal.z * twistCos + normal.z * twistSin;
+
+          const twistOffset = new THREE.Vector3(twistedX, twistedY, twistedZ).multiplyScalar((i % 2 === 0 ? -1 : 1) * dynamicWidth);
+          const wave = Math.sin(u * 10.0 + time * 2.0) * 2.0;
+          positions.setXYZ(i, point.x + twistOffset.x, point.y + twistOffset.y + wave, point.z + twistOffset.z);
+        }
+
+        positions.needsUpdate = true;
+
+        // Orbit ribbon around center
+        const orbitRadius = 150;
+        const angleAroundCenter = time * 0.2;
+        ribbonMesh.position.x = Math.sin(angleAroundCenter) * orbitRadius;
+        ribbonMesh.position.z = Math.cos(angleAroundCenter) * orbitRadius;
+        ribbonMesh.rotation.y = angleAroundCenter + Math.PI / 2;
+      }
+
+      // --- Space background with reliable texture and async loading (fully refactored) ---
       const spaceTexture = textureLoader.load(
         "./assets/starfield.png",
         () => {
@@ -1938,6 +2055,7 @@ scene.add(cometTrails);
       let lastTime = performance.now();
 
       function animate() {
+        updateRibbon();
         // Smooth interpolation for time scale (for smooth time flow)
         if (choppySpeedEnabled) {
           displayedTimeScale += (timeScale - displayedTimeScale) * 0.05;
