@@ -1130,8 +1130,15 @@
           2000
         );
         camera.position.z = 30;
-
         const renderer = new THREE.WebGLRenderer({ antialias: true });
+        const renderTarget = new THREE.WebGLRenderTarget(
+          window.innerWidth,
+          window.innerHeight
+        );
+        const mirrorComposer = new THREE.EffectComposer(renderer, renderTarget);
+        // ... (all postprocessing passes are defined below)
+        // Set up mirrorComposer passes after all postprocessing passes are defined
+
         renderer.setSize(window.innerWidth, window.innerHeight);
         renderer.setPixelRatio(window.devicePixelRatio);
         document.body.appendChild(renderer.domElement);
@@ -1152,17 +1159,24 @@
           0.5, // radius
           0.9 // threshold
         );
-        composer.addPass(renderPass);
-        composer.addPass(bloomPass);
-        const rgbShift = new THREE.ShaderPass(THREE.RGBShiftShader);
-        rgbShift.uniforms["amount"].value = 0.0015;
-        composer.addPass(rgbShift);
-        // Add wormhole pass (after rgbshift)
+        mirrorComposer.addPass(new THREE.RenderPass(scene, camera));
+        mirrorComposer.addPass(
+          new THREE.UnrealBloomPass(
+            new THREE.Vector2(window.innerWidth, window.innerHeight),
+            2.0,
+            0.5,
+            0.9
+          )
+        );
         const wormholePass = new THREE.ShaderPass(wormholeShader);
-        wormholePass.enabled = false;
-        composer.addPass(wormholePass);
-        // Add meteor shower to scene
-        scene.add(meteors);
+
+        const rgbShiftMirror = new THREE.ShaderPass(THREE.RGBShiftShader);
+        rgbShiftMirror.uniforms["amount"].value = 0.0015;
+        mirrorComposer.addPass(rgbShiftMirror);
+        const wormholePassMirror = new THREE.ShaderPass(wormholeShader);
+        wormholePassMirror.enabled = wormholePass.enabled;
+        mirrorComposer.addPass(wormholePassMirror);
+
         // --- Fisheye Shader Pass ---
         const fisheyeShader = {
           uniforms: {
@@ -1198,14 +1212,80 @@
         }
       `,
         };
+
+        const invertPassMirror = new THREE.ShaderPass(invertShader);
+        invertPassMirror.enabled = invertPass.enabled;
+        mirrorComposer.addPass(invertPassMirror);
+        composer.addPass(renderPass);
+        composer.addPass(bloomPass);
+        const rgbShift = new THREE.ShaderPass(THREE.RGBShiftShader);
+        rgbShift.uniforms["amount"].value = 0.0015;
+        composer.addPass(rgbShift);
+        // Add wormhole pass (after rgbshift)
+        wormholePass.enabled = false;
+        composer.addPass(wormholePass);
+        // Add meteor shower to scene
+        scene.add(meteors);
+        // --- Fisheye Shader Pass ---
         const fisheyePass = new THREE.ShaderPass(fisheyeShader);
         fisheyePass.enabled = false;
         composer.addPass(fisheyePass);
         composer.addPass(invertPass);
+        const fisheyePassMirror = new THREE.ShaderPass(fisheyeShader);
+        fisheyePassMirror.enabled = fisheyePass.enabled;
+        mirrorComposer.addPass(fisheyePassMirror);
+
+        const orthoScene = new THREE.Scene();
+        const orthoCamera = new THREE.OrthographicCamera(-1, 1, 1, -1, 0, 1);
+
+        const mirrorShader = {
+          uniforms: {
+            tDiffuse: { value: null },
+            mirrorHorizontal: { value: false },
+            mirrorVertical: { value: false },
+          },
+          vertexShader: `
+    varying vec2 vUv;
+    void main() {
+      vUv = uv;
+      gl_Position = vec4(position.xy, 0.0, 1.0);
+    }
+  `,
+          fragmentShader: `
+    uniform sampler2D tDiffuse;
+    uniform bool mirrorHorizontal;
+    uniform bool mirrorVertical;
+    varying vec2 vUv;
+
+    void main() {
+      vec2 uv = vUv;
+      if (mirrorHorizontal) uv.x = 1.0 - uv.x;
+      if (mirrorVertical) uv.y = 1.0 - uv.y;
+      gl_FragColor = texture2D(tDiffuse, uv);
+    }
+  `,
+        };
+
+        const shaderMat = new THREE.ShaderMaterial({
+          uniforms: THREE.UniformsUtils.clone(mirrorShader.uniforms),
+          vertexShader: mirrorShader.vertexShader,
+          fragmentShader: mirrorShader.fragmentShader,
+        });
+
+        const quadGeo = new THREE.PlaneGeometry(2, 2);
+        const mirrorQuad = new THREE.Mesh(quadGeo, shaderMat);
+        orthoScene.add(mirrorQuad);
 
         // --- Glitch Pass (subtle, momentary, controlled by glitchMode) ---
         // We define glitchPass here so it's available to animate().
         let glitchPass;
+        glitchPass = new THREE.GlitchPass();
+        glitchPass.enabled = false;
+        composer.addPass(glitchPass);
+
+        const glitchPassMirror = new THREE.GlitchPass();
+        glitchPassMirror.enabled = glitchPass.enabled;
+        mirrorComposer.addPass(glitchPassMirror);
 
         // --- Retract Shapes effect ---
         function triggerRetract() {
@@ -1358,7 +1438,7 @@
               break;
             case "m":
               // if (e.shiftKey) {
-                mirrorModeEnabled = !mirrorModeEnabled;
+              mirrorModeEnabled = !mirrorModeEnabled;
               // } else {
               //   trailsEnabled = !trailsEnabled;
               // }
@@ -1392,7 +1472,8 @@
             case "h":
               {
                 const cm = document.getElementById("controlMap");
-                cm.style.display = cm.style.display === "none" ? "block" : "none";
+                cm.style.display =
+                  cm.style.display === "none" ? "block" : "none";
               }
               break;
             case "H": // Shift+H for green palette
@@ -2202,6 +2283,7 @@
         let lastTime = performance.now();
 
         function animate() {
+          
           updateRibbon();
           // Smooth interpolation for time scale (for smooth time flow)
           if (choppySpeedEnabled) {
@@ -2505,35 +2587,52 @@
           controls.update();
           // Mirror-mode rendering logic
           if (mirrorModeEnabled) {
+            renderer.setRenderTarget(renderTarget);
+            
+            // Synchronize mirror pass states with the main ones
+            wormholePassMirror.enabled = wormholePass.enabled;
+            fisheyePassMirror.enabled = fisheyePass.enabled;
+            invertPassMirror.enabled = invertPass.enabled;
+            glitchPassMirror.enabled = glitchPass.enabled;
+            glitchPassMirror.curF = glitchPass.curF;
+            glitchPassMirror.generateTrigger();
+            glitchPassMirror.goWild = glitchPass.goWild;
+            mirrorComposer.render();
+            renderer.setRenderTarget(null);
+            fisheyePassMirror.enabled = fisheyePass.enabled;
+
+            // mirrorComposer.render(); // ✅ critical render to texture
+            renderer.render(scene, camera);
+
+            renderer.setRenderTarget(null);
+
             const w = window.innerWidth;
             const h = window.innerHeight;
-
+            // composer.render(); // render scene to texture
+            renderer.setRenderTarget(null);
+            shaderMat.uniforms.tDiffuse.value = renderTarget.texture;
             renderer.setScissorTest(true);
 
-            // Left side: regular camera view
+            // Left side (normal)
+            shaderMat.uniforms.mirrorHorizontal.value = false;
             renderer.setViewport(0, 0, w / 2, h);
             renderer.setScissor(0, 0, w / 2, h);
-            composer.render();
+            renderer.render(orthoScene, orthoCamera);
 
-            // Right side: mirrored camera view
-            const originalScaleX = camera.scale.x;
-            camera.scale.x = -Math.abs(originalScaleX);
-
+            // Right side (mirrored)
+            shaderMat.uniforms.mirrorHorizontal.value = true;
             renderer.setViewport(w / 2, 0, w / 2, h);
             renderer.setScissor(w / 2, 0, w / 2, h);
-            composer.render();
-
-            camera.scale.x = originalScaleX;
+            renderer.render(orthoScene, orthoCamera);
 
             renderer.setScissorTest(false);
-          } 
-            else {
-              renderer.setScissorTest(false);
-renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
-renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
-composer.render();
-}
-          
+  
+          } else {
+            renderer.setScissorTest(false);
+            renderer.setViewport(0, 0, window.innerWidth, window.innerHeight);
+            renderer.setScissor(0, 0, window.innerWidth, window.innerHeight);
+            composer.render();
+          }
           // renderer.render(scene, camera);
           glitter.rotation.y += 0.006 * displayedTimeScale;
           glitter.rotation.x += 0.003 * displayedTimeScale;
