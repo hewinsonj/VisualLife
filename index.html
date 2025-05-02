@@ -1671,30 +1671,22 @@ scene.add(cometTrails);
       scene.add(vortex);
 
       // --- Orbiting Glyphs around Sacred Group ---
-      const runeTextures = [
-        new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/disc.png"),
-        new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/circle.png"),
-        new THREE.TextureLoader().load("https://threejs.org/examples/textures/sprites/square.png")
-      ];
-      const runeMat = new THREE.SpriteMaterial({
-        map: runeTextures[0],
-        color: 0xff00ff,
+      const customTexture = new THREE.TextureLoader().load('./assets/spritesacred.png');
+      const customMaterial = new THREE.SpriteMaterial({
+        map: customTexture,
+        color: 0xffffff,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false
       });
+
       const glyphs = [];
       for (let i = 0; i < 12; i++) {
-        const sprite = new THREE.Sprite(runeMat.clone());
-        sprite.scale.set(5, 5, 1);
+        const sprite = new THREE.Sprite(customMaterial.clone());
+        sprite.scale.set(6, 6, 1);
         scene.add(sprite);
         glyphs.push({ sprite, angle: i * ((Math.PI * 2) / 12), radius: 25 });
       }
-
-      // Periodically randomize glyph textures
-      setInterval(() => {
-        glyphs.forEach((g) => {
-          g.sprite.material.map = runeTextures[Math.floor(Math.random() * runeTextures.length)];
-          g.sprite.material.needsUpdate = true;
-        });
-      }, 7000);
 
       // --- Mirrored Reflective Floor ---
       const floorMat = new THREE.MeshPhongMaterial({
@@ -1729,16 +1721,16 @@ scene.add(cometTrails);
       glassSphere.position.set(0, 0, -25);
       scene.add(glassSphere);
 
-      for (let i = 0; i < 8; i++) {
-        const rune = new THREE.Sprite(runeMat.clone());
-        rune.scale.set(10, 10, 1);
-        rune.position.set(
-          Math.sin(i) * 40,
-          Math.cos(i) * 40,
-          Math.sin(i * 2) * 20
-        );
-        scene.add(rune);
-      }
+      // for (let i = 0; i < 8; i++) {
+      //   const rune = new THREE.Sprite(runeMat.clone());
+      //   rune.scale.set(10, 10, 1);
+      //   rune.position.set(
+      //     Math.sin(i) * 40,
+      //     Math.cos(i) * 40,
+      //     Math.sin(i * 2) * 20
+      //   );
+      //   scene.add(rune);
+      // }
 
       const helixGeo = new THREE.BufferGeometry();
       const helixVerts = [];
@@ -1844,6 +1836,8 @@ scene.add(cometTrails);
       // ]);
       // curvePath.closed = true;
 
+      // --- Flowing Ribbon Setup (COMMENTED OUT) ---
+      /*
       // Define CatmullRomCurve3 path for flowing ribbon (with increased curvature)
       const ribbonPath = new THREE.CatmullRomCurve3([
         new THREE.Vector3(-60, 15, -60),
@@ -1944,14 +1938,16 @@ scene.add(cometTrails);
         positions.needsUpdate = true;
 
         // Orbit ribbon around center
-        const orbitRadius = 150;
+        const orbitRadius = 250;
         const angleAroundCenter = time * 0.2;
         ribbonMesh.position.x = Math.sin(angleAroundCenter) * orbitRadius;
         ribbonMesh.position.z = Math.cos(angleAroundCenter) * orbitRadius;
         ribbonMesh.rotation.y = angleAroundCenter + Math.PI / 2;
       }
+      */
 
       // --- Space background with reliable texture and async loading (fully refactored) ---
+      const textureLoader = new THREE.TextureLoader();
       const spaceTexture = textureLoader.load(
         "./assets/starfield.png",
         () => {
@@ -2055,7 +2051,18 @@ scene.add(cometTrails);
       let lastTime = performance.now();
 
       function animate() {
-        updateRibbon();
+        // Animate orbiting glyphs
+        if (Array.isArray(glyphs)) {
+          glyphs.forEach((g) => {
+            g.angle += 0.002;
+            g.sprite.position.set(
+              Math.cos(g.angle) * g.radius,
+              8,
+              Math.sin(g.angle) * g.radius
+            );
+          });
+        }
+        // updateRibbon(); // (COMMENTED OUT)
         // Smooth interpolation for time scale (for smooth time flow)
         if (choppySpeedEnabled) {
           displayedTimeScale += (timeScale - displayedTimeScale) * 0.05;
@@ -2158,31 +2165,31 @@ scene.add(cometTrails);
         }
         meteorGeo.attributes.position.needsUpdate = true;
 
-        // Animate orbiting glyphs
-        glyphs.forEach((g, i) => {
-          g.angle += 0.002 * displayedTimeScale;
+        // // Animate orbiting glyphs
+        // glyphs.forEach((g, i) => {
+        //   g.angle += 0.002 * displayedTimeScale;
 
-          // Pulsing size effect
-          const pulse = 1 + Math.sin(now * 0.002 + i) * 0.3;
-          g.sprite.scale.set(5 * pulse, 5 * pulse, 1);
+        //   // Pulsing size effect
+        //   const pulse = 1 + Math.sin(now * 0.002 + i) * 0.3;
+        //   g.sprite.scale.set(5 * pulse, 5 * pulse, 1);
 
-          // Orbit position
-          g.sprite.position.set(
-            Math.cos(g.angle) * g.radius,
-            10,
-            Math.sin(g.angle) * g.radius
-          );
+        //   // Orbit position
+        //   g.sprite.position.set(
+        //     Math.cos(g.angle) * g.radius,
+        //     10,
+        //     Math.sin(g.angle) * g.radius
+        //   );
 
-          // Animate opacity (glow effect)
-          g.sprite.material.opacity = 0.5 + Math.sin(now * 0.003 + i) * 0.3;
+        //   // Animate opacity (glow effect)
+        //   g.sprite.material.opacity = 0.5 + Math.sin(now * 0.003 + i) * 0.3;
 
-          // Animate color hue drift
-          g.sprite.material.color.setHSL(
-            0.8 + Math.sin(now * 0.001 + i) * 0.05, // hue drift
-            1,
-            0.6
-          );
-        });
+        //   // Animate color hue drift
+        //   g.sprite.material.color.setHSL(
+        //     0.8 + Math.sin(now * 0.001 + i) * 0.05, // hue drift
+        //     1,
+        //     0.6
+        //   );
+        // });
 
         // Animate stationary rune sprites (pinkish-blue outlined ones)
         scene.children.forEach((child) => {
@@ -2378,7 +2385,7 @@ scene.add(cometTrails);
 
       // --- Explosion effect ---
       function triggerExplosion() {
-        glyphs.forEach(g => g.radius += 1.5);
+        // glyphs.forEach(g => g.radius += 1.5);
 planets.forEach(p => p.userData.radius += 1.5);
         explosionSound.play();
         shapes.forEach((mesh, i) => {
